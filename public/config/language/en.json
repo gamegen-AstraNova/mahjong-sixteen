@@ -102,12 +102,12 @@
     "help": {
       "title": "Rules & Scoring", "rulesTitle": "Taiwan 16-tile rules", "taiTitle": "Tai list", "scoringTitle": "Fund calculation",
       "ruleGoal": "Complete five melds and one pair. A concealed hand normally has 16 tiles and 17 after drawing.",
-      "ruleTurn": "Draw one tile and discard one tile. If no action is taken within 30 seconds, the computer acts for that player.",
+      "ruleTurn": "Turns proceed counterclockwise. Draw one tile and discard one tile; if no action is taken within 30 seconds, the computer acts for that player.",
       "ruleFlowers": "A flower is exposed as soon as it is drawn, then a replacement tile is drawn from the wall.",
-      "ruleCalls": "Chow may only claim the previous player's discard; Pong, Kong and a winning discard may be claimed when available.",
+      "ruleCalls": "Chow may only claim the previous player's discard; Pong, Kong and a winning discard may be claimed when available. An exposed Pong may be upgraded to Kong after drawing the fourth tile.",
       "ruleReady": "Declaring ready locks the hand. Future non-winning draws are discarded automatically.",
-      "scoringFormula": "Payment per opponent = 500 base points + total tai × 250 points.",
-      "scoringDiscard": "Win by discard: the discarder pays three times the payment.",
+      "scoringFormula": "Payment per opponent = 500 base points + total tai × 200 points.",
+      "scoringDiscard": "Win by discard: only the discarder pays one payment; it is not tripled.",
       "scoringSelfDraw": "Self-draw: each of the other three players pays the payment.",
       "scoringCoins": "After settlement, every {points} table points converts to 1 coin. Funds never fall below zero."
     }

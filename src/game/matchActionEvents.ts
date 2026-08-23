@@ -13,9 +13,12 @@ export function detectMatchActionSignals(previous: MahjongState, current: Mahjon
 
   for (let seat = 0; seat < 4; seat += 1) {
     const matchSeat = seat as MatchSeat;
-    const previousMeldCount = previous.players[seat]?.melds.length ?? 0;
-    const addedMelds = current.players[seat]?.melds.slice(previousMeldCount) ?? [];
+    const previousMelds = previous.players[seat]?.melds ?? [];
+    const currentMelds = current.players[seat]?.melds ?? [];
+    const addedMelds = currentMelds.slice(previousMelds.length);
     addedMelds.forEach((meld) => signals.push({ seat: matchSeat, kind: meld.kind }));
+    const upgradedToKong = currentMelds.some((meld, index) => meld.kind === 'kong' && previousMelds[index]?.kind === 'pong');
+    if (upgradedToKong) signals.push({ seat: matchSeat, kind: 'kong' });
 
     if (!previous.readyDeclared[seat] && current.readyDeclared[seat]) {
       signals.push({ seat: matchSeat, kind: 'ready' });

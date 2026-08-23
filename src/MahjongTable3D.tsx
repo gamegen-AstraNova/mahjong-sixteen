@@ -2,7 +2,7 @@ import { useEffect, useRef, type CSSProperties } from 'react';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { tileFaceAsset } from './config/assets';
-import type { MahjongState, Meld, PlayerHand, TileId } from './game/mahjong';
+import type { LastTileFocus, MahjongState, PlayerHand, TileId } from './game/mahjong';
 import type { MatchActionKind, MatchSeat } from './game/matchActionEvents';
 import { MatchActionCallout } from './MatchActionCallout';
 import type { PlatformRuntime } from './services/resourceLoader';
@@ -12,23 +12,21 @@ import './MahjongTable3D.css';
 const TABLE_SIZE = 15.4;
 const TILE_WIDTH = 0.66;
 const TILE_HEIGHT = 0.92;
-const TILE_DEPTH = 0.18;
+const TILE_DEPTH = 0.36;
+const TILE_SELF_ILLUMINATION = 0.42;
 const PLAYER_TILE_SCALE = 0.86;
 const OPPONENT_HAND_TILE_SCALE = 0.86;
 const RIVER_TILE_SCALE = 0.67;
 const OPEN_TILE_SCALE = 0.8;
-const FLOWER_TILE_SCALE = 0.68;
 const WALL_TILE_SCALE = 0.54;
-const PLAYER_HAND_LEFT = -4.7;
 const PLAYER_HAND_CAMERA_Y = -3.24;
 const PLAYER_HAND_CAMERA_Z = -11;
 const SEAT_HAND_Z = 6.02;
-const SEAT_FLOWER_Z = 5.55;
-const SEAT_WALL_Z = 4.96;
+const SEAT_BONUS_Z = 5.4;
+const SEAT_WALL_Z = 4.62;
 const SELF_DRAW_TILE_Z = 4.3;
-const STATUS_HINT_Z = 4.48;
-const SEAT_ROW_LEFT = -5.45;
-const SEAT_ROW_RIGHT = 5.45;
+const SEAT_BONUS_LEFT = -3.55;
+const BONUS_GROUP_GAP = 0.24;
 const SEAT_ROTATIONS = [0, -Math.PI / 2, Math.PI, Math.PI / 2] as const;
 const RIVER_COLUMNS = 5;
 const RIVER_ROWS = 4;
@@ -48,6 +46,7 @@ type SeatIndex = 0 | 1 | 2 | 3;
 interface MahjongTable3DProps {
   runtime: PlatformRuntime;
   state: MahjongState;
+  floorTexturePath: string;
   tableTexturePath: string;
   tileBackTexturePath: string;
   participantNames: [string, string, string, string];
@@ -70,6 +69,7 @@ interface MahjongTable3DProps {
 interface TableScene {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
+  playerHandScene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   content: THREE.Group;
   playerHand: THREE.Group;
@@ -81,7 +81,8 @@ interface TableScene {
   textures: Map<string, THREE.Texture>;
   centerDisplayCanvas: HTMLCanvasElement;
   centerDisplayTexture: THREE.CanvasTexture;
-  winningTileGlowTexture: THREE.CanvasTexture;
+  lastTileMarkerTexture: THREE.CanvasTexture;
+  lastTileMarkers: THREE.Sprite[];
 }
 
 interface TileVisualOptions {
@@ -93,27 +94,51 @@ interface TileVisualOptions {
   interactiveIndex?: number;
   highlighted?: boolean;
   disabled?: boolean;
-  winning?: boolean;
 }
 
 const bodyGeometry = new RoundedBoxGeometry(TILE_WIDTH, TILE_HEIGHT, TILE_DEPTH, 3, 0.055);
 const faceGeometry = new THREE.PlaneGeometry(TILE_WIDTH * 0.84, TILE_HEIGHT * 0.84);
-const winningGlowGeometry = new THREE.PlaneGeometry(TILE_WIDTH * 2.45, TILE_HEIGHT * 1.95);
-
-function createWinningTileGlowTexture(): THREE.CanvasTexture {
+function createLastTileMarkerTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 192;
-  canvas.height = 192;
+  canvas.height = 224;
   const context = canvas.getContext('2d');
   if (context) {
-    const glow = context.createRadialGradient(96, 96, 12, 96, 96, 96);
-    glow.addColorStop(0, 'rgba(255, 255, 235, 1)');
-    glow.addColorStop(0.24, 'rgba(255, 224, 112, .94)');
-    glow.addColorStop(0.52, 'rgba(255, 174, 42, .62)');
-    glow.addColorStop(0.78, 'rgba(255, 119, 18, .2)');
-    glow.addColorStop(1, 'rgba(255, 106, 0, 0)');
+    const glow = context.createRadialGradient(96, 92, 8, 96, 92, 88);
+    glow.addColorStop(0, 'rgba(255, 251, 202, .95)');
+    glow.addColorStop(.34, 'rgba(255, 207, 66, .62)');
+    glow.addColorStop(.72, 'rgba(255, 164, 18, .18)');
+    glow.addColorStop(1, 'rgba(255, 149, 0, 0)');
     context.fillStyle = glow;
-    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillRect(8, 4, 176, 176);
+
+    context.save();
+    context.translate(96, 82);
+    context.shadowColor = 'rgba(255, 185, 28, .95)';
+    context.shadowBlur = 24;
+    context.fillStyle = '#fff3a2';
+    context.strokeStyle = '#f6b81f';
+    context.lineWidth = 8;
+    context.beginPath();
+    context.moveTo(0, -48);
+    context.lineTo(42, 0);
+    context.lineTo(0, 48);
+    context.lineTo(-42, 0);
+    context.closePath();
+    context.fill();
+    context.stroke();
+    context.restore();
+
+    const tail = context.createLinearGradient(96, 118, 96, 206);
+    tail.addColorStop(0, 'rgba(255, 226, 104, .95)');
+    tail.addColorStop(1, 'rgba(255, 184, 24, 0)');
+    context.fillStyle = tail;
+    context.beginPath();
+    context.moveTo(82, 118);
+    context.lineTo(110, 118);
+    context.lineTo(96, 206);
+    context.closePath();
+    context.fill();
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -177,10 +202,10 @@ function makeTile(
   tile.rotation.order = 'YXZ';
   const body = new THREE.Mesh(bodyGeometry, new THREE.MeshStandardMaterial({
     color: options.disabled ? 0x747b82 : 0xfffdf6,
+    emissive: options.disabled ? 0x000000 : 0xfffdf6,
+    emissiveIntensity: options.disabled ? 0 : TILE_SELF_ILLUMINATION,
     roughness: 0.42,
     metalness: 0.02,
-    emissive: options.winning ? 0xffa820 : 0x000000,
-    emissiveIntensity: options.winning ? 0.9 : 0,
   }));
   body.castShadow = true;
   body.receiveShadow = true;
@@ -191,44 +216,25 @@ function makeTile(
     const face = new THREE.Mesh(faceGeometry, new THREE.MeshStandardMaterial({
       map: texture,
       color: options.disabled ? 0x666b70 : 0xffffff,
+      emissive: options.disabled ? 0x000000 : 0xffffff,
+      emissiveMap: options.disabled ? null : texture,
+      emissiveIntensity: options.disabled ? 0 : TILE_SELF_ILLUMINATION,
       transparent: true,
       roughness: 0.34,
       metalness: 0,
       depthWrite: true,
-      emissive: options.winning ? 0xffad21 : 0x000000,
-      emissiveIntensity: options.winning ? 0.52 : 0,
     }));
     face.position.z = TILE_DEPTH / 2 + 0.006;
     face.renderOrder = 2;
     tile.add(face);
   }
 
-  if (options.highlighted || options.winning) {
+  if (options.highlighted) {
     const edge = new THREE.LineSegments(
       new THREE.EdgesGeometry(bodyGeometry, 28),
-      new THREE.LineBasicMaterial({ color: options.winning ? 0xffbd25 : 0xffd766, transparent: true, opacity: 0.96 }),
+      new THREE.LineBasicMaterial({ color: 0xffd766, transparent: true, opacity: 0.96 }),
     );
     tile.add(edge);
-  }
-
-  if (options.winning) {
-    const halo = new THREE.Mesh(
-      winningGlowGeometry,
-      new THREE.MeshBasicMaterial({
-        map: tableScene.winningTileGlowTexture,
-        color: 0xffd36a,
-        transparent: true,
-        opacity: 0.94,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
-    );
-    halo.position.z = -TILE_DEPTH / 2 - 0.008;
-    tile.add(halo);
-    const winLight = new THREE.PointLight(0xffc24a, 4.6, 3.15, 1.7);
-    winLight.position.set(0, 0.24, 0.42);
-    tile.add(winLight);
   }
 
   if (options.flat) {
@@ -250,6 +256,24 @@ function makeTile(
   return tile;
 }
 
+function addLastTileMarker(parent: THREE.Group, tableScene: TableScene, tile: THREE.Object3D): void {
+  const marker = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tableScene.lastTileMarkerTexture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  }));
+  marker.position.set(tile.position.x, 1.05, tile.position.z);
+  marker.scale.set(.76, .9, 1);
+  marker.renderOrder = 30;
+  marker.userData.baseY = marker.position.y;
+  marker.userData.baseScaleX = marker.scale.x;
+  marker.userData.baseScaleY = marker.scale.y;
+  tableScene.lastTileMarkers.push(marker);
+  parent.add(marker);
+}
+
 function addLineup(parent: THREE.Group, objects: THREE.Object3D[], originX: number, originZ: number, stepX: number, stepZ: number, rotation = 0): void {
   objects.forEach((object, index) => {
     setObjectPosition(object, originX + stepX * index, originZ + stepZ * index);
@@ -258,20 +282,11 @@ function addLineup(parent: THREE.Group, objects: THREE.Object3D[], originX: numb
   });
 }
 
-function setHudRendering(object: THREE.Object3D): void {
-  let renderOrder = 100;
+function configurePlayerHandTile(object: THREE.Object3D): void {
   object.traverse((child) => {
     if (!(child instanceof THREE.Mesh || child instanceof THREE.LineSegments)) return;
     child.castShadow = false;
     child.receiveShadow = false;
-    const materials = Array.isArray(child.material) ? child.material : [child.material];
-    materials.forEach((material) => {
-      material.depthTest = false;
-      material.depthWrite = false;
-      material.transparent = true;
-    });
-    child.renderOrder = renderOrder;
-    renderOrder += 1;
   });
 }
 
@@ -343,7 +358,7 @@ function addRiver(
   faceTextures: Map<TileId, THREE.Texture>,
   backTexture: THREE.Texture,
   tiles: TileId[],
-  highlightLast: boolean,
+  markLast: boolean,
 ): void {
   tiles.forEach((tileId, index) => {
     const column = index % RIVER_COLUMNS;
@@ -352,49 +367,42 @@ function addRiver(
       tile: tileId,
       flat: true,
       scale: RIVER_TILE_SCALE,
-      winning: highlightLast && index === tiles.length - 1,
     });
     setObjectPosition(tile, (column - 2.5) * RIVER_STEP_X, RIVER_ORIGIN_Z + row * RIVER_STEP_Z);
     parent.add(tile);
+    if (markLast && index === tiles.length - 1) addLastTileMarker(parent, tableScene, tile);
   });
 }
 
-function flattenedMeldTiles(melds: Meld[]): { tile: TileId; faceDown: boolean }[] {
-  return melds.flatMap((meld) => meld.tiles.map((tile, index) => ({
-    tile,
-    faceDown: meld.concealed && (index === 0 || index === meld.tiles.length - 1),
-  })));
-}
-
-function addOpenTiles(
+function addBonusTiles(
   parent: THREE.Group,
   tableScene: TableScene,
   faceTextures: Map<TileId, THREE.Texture>,
   backTexture: THREE.Texture,
   hand: PlayerHand,
+  focus: LastTileFocus | null,
 ): void {
-  const openTiles = flattenedMeldTiles(hand.melds);
-  if (openTiles.length === 0) return;
+  const openTiles = hand.melds.flatMap((meld, meldIndex) => meld.tiles.map((tile, tileIndex) => ({
+    tile,
+    faceDown: meld.concealed && (tileIndex === 0 || tileIndex === meld.tiles.length - 1),
+    meldIndex,
+    tileIndex,
+  })));
+  const bonusTiles = [
+    ...hand.flowers.map((tile) => ({ tile, faceDown: false, meldIndex: -1, tileIndex: -1 })),
+    ...openTiles,
+  ];
+  if (bonusTiles.length === 0) return;
   const step = TILE_WIDTH * OPEN_TILE_SCALE;
-  openTiles.forEach((entry, index) => {
+  const groupGap = hand.flowers.length > 0 && openTiles.length > 0 ? BONUS_GROUP_GAP : 0;
+  bonusTiles.forEach((entry, index) => {
     const tile = makeTile(tableScene, faceTextures, backTexture, { tile: entry.tile, faceDown: entry.faceDown, flat: true, scale: OPEN_TILE_SCALE });
-    setObjectPosition(tile, SEAT_ROW_RIGHT - index * step, SEAT_HAND_Z);
+    const flowerBoundaryGap = index >= hand.flowers.length ? groupGap : 0;
+    setObjectPosition(tile, SEAT_BONUS_LEFT + index * step + flowerBoundaryGap, SEAT_BONUS_Z);
     parent.add(tile);
-  });
-}
-
-function addFlowers(
-  parent: THREE.Group,
-  tableScene: TableScene,
-  faceTextures: Map<TileId, THREE.Texture>,
-  backTexture: THREE.Texture,
-  flowers: TileId[],
-): void {
-  const step = 0.49;
-  flowers.forEach((tileId, index) => {
-    const tile = makeTile(tableScene, faceTextures, backTexture, { tile: tileId, flat: true, scale: FLOWER_TILE_SCALE });
-    setObjectPosition(tile, (index - (flowers.length - 1) / 2) * step, SEAT_FLOWER_Z);
-    parent.add(tile);
+    if (focus?.area === 'meld' && entry.meldIndex === focus.meldIndex && entry.tileIndex === focus.tileIndex) {
+      addLastTileMarker(parent, tableScene, tile);
+    }
   });
 }
 
@@ -442,6 +450,7 @@ function addPlayerHand(
   const visibleTiles = tiles
     .map((tileId, index) => ({ tileId, index }))
     .filter(({ index }) => index !== winningIndex);
+  const startX = -(((visibleTiles.length - 1) * step) + separatedGap) / 2;
   visibleTiles.forEach(({ tileId, index }, displayIndex) => {
     const isDrawn = index === drawnIndex;
     const tile = makeTile(tableScene, faceTextures, backTexture, {
@@ -451,13 +460,13 @@ function addPlayerHand(
       highlighted: !readySelectionActive && isDrawn && !revealWinner,
       disabled: readySelectionActive && !playableIndices.has(index),
     });
-    setObjectPosition(tile, PLAYER_HAND_LEFT + displayIndex * step + (index === separatedIndex ? separatedGap : 0), 0);
-    setHudRendering(tile);
+    setObjectPosition(tile, startX + displayIndex * step + (index === separatedIndex ? separatedGap : 0), 0);
+    configurePlayerHandTile(tile);
     parent.add(tile);
   });
 }
 
-function addOpponentConcealedHand(
+function addSeatConcealedHand(
   parent: THREE.Group,
   tableScene: TableScene,
   faceTextures: Map<TileId, THREE.Texture>,
@@ -474,14 +483,16 @@ function addOpponentConcealedHand(
   const visibleTiles = tiles
     .map((tileId, index) => ({ tileId, index }))
     .filter(({ index }) => index !== winningIndex);
+  const startX = -((visibleTiles.length - 1) * step) / 2;
   visibleTiles.forEach(({ tileId }, displayIndex) => {
     const tile = makeTile(tableScene, faceTextures, backTexture, {
       tile: tileId,
       faceDown: !revealWinner,
+      flat: revealWinner,
       scale,
     });
-    setObjectPosition(tile, SEAT_ROW_LEFT + displayIndex * step, SEAT_HAND_Z);
-    tile.rotation.y = Math.PI;
+    setObjectPosition(tile, startX + displayIndex * step, SEAT_HAND_Z);
+    if (!revealWinner) tile.rotation.y = Math.PI;
     parent.add(tile);
   });
 }
@@ -504,16 +515,18 @@ function addSelfDrawWinningTile(
     tile: state.lastDrawn,
     flat: true,
     scale: PLAYER_TILE_SCALE,
-    winning: true,
   });
   setObjectPosition(tile, 0, SELF_DRAW_TILE_Z);
   tile.position.y += 0.05;
   parent.add(tile);
+  if (state.lastTileFocus?.area === 'selfDraw' && state.lastTileFocus.seat === seat) {
+    addLastTileMarker(parent, tableScene, tile);
+  }
 }
 
 function disposeObject(object: THREE.Object3D): void {
   object.traverse((child) => {
-    if (!(child instanceof THREE.Mesh || child instanceof THREE.LineSegments)) return;
+    if (!(child instanceof THREE.Mesh || child instanceof THREE.LineSegments || child instanceof THREE.Sprite)) return;
     const material = child.material as THREE.Material | THREE.Material[];
     (Array.isArray(material) ? material : [material]).forEach((entry) => entry.dispose());
   });
@@ -526,6 +539,7 @@ function participantStyle(seat: SeatIndex): CSSProperties {
 export function MahjongTable3D({
   runtime,
   state,
+  floorTexturePath,
   tableTexturePath,
   tileBackTexturePath,
   participantNames,
@@ -540,7 +554,6 @@ export function MahjongTable3D({
 }: MahjongTable3DProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const mountRef = useRef<HTMLDivElement>(null);
-  const statusHintRef = useRef<HTMLDivElement>(null);
   const tableSceneRef = useRef<TableScene | null>(null);
   const onPlayerTileClickRef = useRef(onPlayerTileClick);
   onPlayerTileClickRef.current = onPlayerTileClick;
@@ -551,17 +564,19 @@ export function MahjongTable3D({
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.autoClear = false;
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.domElement.className = 'match-three-canvas';
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
+    const playerHandScene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 80);
     camera.position.set(0, CAMERA_HEIGHT, CAMERA_DISTANCE);
     camera.lookAt(0, 0, CAMERA_TARGET_Z);
-    scene.add(new THREE.HemisphereLight(0xf8fbff, 0x31435d, 2));
-    const key = new THREE.DirectionalLight(0xffffff, 2.45);
+    scene.add(new THREE.HemisphereLight(0xf8fbff, 0x31435d, 1));
+    const key = new THREE.DirectionalLight(0xffffff, 1.225);
     key.position.set(-5, 12, 8);
     key.castShadow = true;
     key.shadow.mapSize.set(2048, 2048);
@@ -570,9 +585,17 @@ export function MahjongTable3D({
     key.shadow.camera.top = 10;
     key.shadow.camera.bottom = -10;
     scene.add(key);
-    const fill = new THREE.DirectionalLight(0x8edbff, 0.8);
+    const fill = new THREE.DirectionalLight(0x8edbff, 0.4);
     fill.position.set(8, 6, -7);
     scene.add(fill);
+
+    playerHandScene.add(new THREE.HemisphereLight(0xf8fbff, 0x31435d, 1));
+    const playerHandKey = new THREE.DirectionalLight(0xffffff, 1.075);
+    playerHandKey.position.set(-5, 12, 8);
+    playerHandScene.add(playerHandKey);
+    const playerHandFill = new THREE.DirectionalLight(0x8edbff, 0.35);
+    playerHandFill.position.set(8, 6, -7);
+    playerHandScene.add(playerHandFill);
 
     const content = new THREE.Group();
     scene.add(content);
@@ -580,18 +603,19 @@ export function MahjongTable3D({
     playerHand.position.set(0, PLAYER_HAND_CAMERA_Y, PLAYER_HAND_CAMERA_Z);
     camera.localToWorld(playerHand.position);
     playerHand.quaternion.copy(camera.quaternion);
-    scene.add(playerHand);
+    playerHandScene.add(playerHand);
     const centerDisplayCanvas = document.createElement('canvas');
     centerDisplayCanvas.width = CENTER_DISPLAY_RESOLUTION;
     centerDisplayCanvas.height = CENTER_DISPLAY_RESOLUTION;
     const centerDisplayTexture = new THREE.CanvasTexture(centerDisplayCanvas);
     centerDisplayTexture.colorSpace = THREE.SRGBColorSpace;
     centerDisplayTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-    const winningTileGlowTexture = createWinningTileGlowTexture();
-    winningTileGlowTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    const lastTileMarkerTexture = createLastTileMarkerTexture();
+    lastTileMarkerTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     const tableScene: TableScene = {
       renderer,
       scene,
+      playerHandScene,
       camera,
       content,
       playerHand,
@@ -603,7 +627,8 @@ export function MahjongTable3D({
       textures: new Map(),
       centerDisplayCanvas,
       centerDisplayTexture,
-      winningTileGlowTexture,
+      lastTileMarkerTexture,
+      lastTileMarkers: [],
     };
     tableSceneRef.current = tableScene;
     drawCenterDisplay(tableScene, state.wall.length, secondsLeft);
@@ -614,9 +639,6 @@ export function MahjongTable3D({
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      const statusHintPosition = new THREE.Vector3(0, 0.35, STATUS_HINT_Z).project(camera);
-      statusHintRef.current?.style.setProperty('--match-status-x', `${(statusHintPosition.x * 0.5 + 0.5) * 100}%`);
-      statusHintRef.current?.style.setProperty('--match-status-y', `${(-statusHintPosition.y * 0.5 + 0.5) * 100}%`);
       ([0, 1, 2, 3] as SeatIndex[]).forEach((seat) => {
         const riverCenter = new THREE.Vector3(RIVER_CENTER_X, 0.35, RIVER_CENTER_Z)
           .applyAxisAngle(new THREE.Vector3(0, 1, 0), SEAT_ROTATIONS[seat])
@@ -668,7 +690,21 @@ export function MahjongTable3D({
 
     let frame = 0;
     const render = () => {
+      const elapsed = performance.now() / 1_000;
+      tableScene.lastTileMarkers.forEach((marker) => {
+        const float = Math.sin(elapsed * 4.4) * .09;
+        const pulse = 1 + Math.sin(elapsed * 5.2) * .08;
+        marker.position.y = (marker.userData.baseY as number) + float;
+        marker.scale.set(
+          (marker.userData.baseScaleX as number) * pulse,
+          (marker.userData.baseScaleY as number) * pulse,
+          1,
+        );
+      });
+      renderer.clear();
       renderer.render(scene, camera);
+      renderer.clearDepth();
+      renderer.render(playerHandScene, camera);
       frame = window.requestAnimationFrame(render);
     };
     render();
@@ -683,7 +719,7 @@ export function MahjongTable3D({
       disposeObject(playerHand);
       tableScene.textures.forEach((texture) => texture.dispose());
       tableScene.centerDisplayTexture.dispose();
-      tableScene.winningTileGlowTexture.dispose();
+      tableScene.lastTileMarkerTexture.dispose();
       renderer.dispose();
       renderer.domElement.remove();
       tableSceneRef.current = null;
@@ -720,6 +756,7 @@ export function MahjongTable3D({
 
       if (tableScene.hovered) tableScene.hovered = null;
       tableScene.selectableMeshes.length = 0;
+      tableScene.lastTileMarkers.length = 0;
       disposeObject(tableScene.content);
       tableScene.content.clear();
       disposeObject(tableScene.playerHand);
@@ -769,32 +806,42 @@ export function MahjongTable3D({
       tableScene.content.add(centerDisplay);
 
       const playable = new Set(playableIndices);
+      const playerWinnerRevealed = state.settlement?.reason === 'win' && state.winner === 0;
       ([0, 1, 2, 3] as SeatIndex[]).forEach((seat) => {
         const seatGroup = createSeatGroup(tableScene.content, seat);
-        if (seat !== 0) addOpponentConcealedHand(seatGroup, tableScene, faceTextures, backTexture, state, seat);
+        if (seat !== 0 || playerWinnerRevealed) addSeatConcealedHand(seatGroup, tableScene, faceTextures, backTexture, state, seat);
         addRiver(
           seatGroup,
           tableScene,
           faceTextures,
           backTexture,
           state.players[seat].discards,
-          state.settlement?.reason === 'win' && state.winnerBy === 'discard' && state.loser === seat,
+          state.lastTileFocus?.area === 'river' && state.lastTileFocus.seat === seat,
         );
-        addOpenTiles(seatGroup, tableScene, faceTextures, backTexture, state.players[seat]);
-        addFlowers(seatGroup, tableScene, faceTextures, backTexture, state.players[seat].flowers);
+        addBonusTiles(
+          seatGroup,
+          tableScene,
+          faceTextures,
+          backTexture,
+          state.players[seat],
+          state.lastTileFocus?.area === 'meld' && state.lastTileFocus.seat === seat ? state.lastTileFocus : null,
+        );
         addWall(seatGroup, tableScene, faceTextures, backTexture, wallCountForSeat(state.wall.length, seat));
         addSelfDrawWinningTile(seatGroup, tableScene, faceTextures, backTexture, state, seat);
       });
-      addPlayerHand(tableScene.playerHand, tableScene, faceTextures, backTexture, state, playable, readySelectionActive);
+      if (!playerWinnerRevealed) addPlayerHand(tableScene.playerHand, tableScene, faceTextures, backTexture, state, playable, readySelectionActive);
     };
     void rebuild().catch((error) => console.error('Unable to rebuild 3D mahjong table.', error));
     return () => { cancelled = true; };
   }, [playableIndices, readySelectionActive, runtime, state, tableTexturePath, tileBackTexturePath]);
 
   return (
-    <div className="match-table-stage" ref={stageRef}>
+    <div
+      className="match-table-stage"
+      ref={stageRef}
+      style={{ '--match-floor-texture': `url("${runtime.resolveAsset(floorTexturePath)}")` } as CSSProperties}
+    >
       <div className="match-three-mount" ref={mountRef} role="application" aria-label={status} />
-      <div className="match-status-hint" ref={statusHintRef} aria-live="polite">{status}</div>
       {actionCallout && <MatchActionCallout
         key={actionCallout.id}
         seat={actionCallout.seat}
@@ -804,7 +851,12 @@ export function MahjongTable3D({
       />}
       <div className="match-seat-profiles">
         {([0, 1, 2, 3] as SeatIndex[]).map((seat) => (
-          <article className={`match-seat-profile match-seat-${seat} ${state.currentPlayer === seat ? 'active-turn' : ''}`} key={seat} style={participantStyle(seat)}>
+          <article
+            className={`match-seat-profile match-seat-${seat} ${state.currentPlayer === seat ? 'active-turn' : ''}`}
+            key={seat}
+            style={participantStyle(seat)}
+            tabIndex={seat === 0 ? 0 : undefined}
+          >
             <span className="match-seat-avatar"><img src={runtime.resolveAsset(participantSkins[seat])} alt="" /></span>
             <div><strong>{participantNames[seat]}</strong><b>{state.points[seat].toLocaleString()}</b></div>
             {state.readyDeclared[seat] && <i>{readyLabel}</i>}

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent as ReactWheelEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { ASSETS } from './config/assets';
-import { CHARACTER_IDS, CHARACTER_SKINS, OUTFIT_THEME_SLUGS, TABLES, TILE_BACKS, lobbyBackgroundForOutfit, uiThemeForOutfit } from './config/catalog';
-import { autoPlayCurrentTurn, claimDiscard, concealedKongTiles, createInitialState, declareConcealedKong, declareReady, discardTile, passClaim, readyDiscardIndices, tileLabel, type ClaimOption, type MahjongState } from './game/mahjong';
+import { ASSETS, tileFaceAsset } from './config/assets';
+import { CHARACTER_IDS, CHARACTER_SKINS, OUTFIT_THEME_SLUGS, TABLES, TILE_BACKS, floorBackgroundForOutfit, lobbyBackgroundForOutfit, uiThemeForOutfit } from './config/catalog';
+import { autoPlayCurrentTurn, claimDiscard, createInitialState, declareKong, declareReady, discardTile, kongTiles, passClaim, readyDiscardIndices, tileLabel, type ClaimOption, type MahjongState, type MeldKind, type TileId } from './game/mahjong';
 import { detectMatchActionSignals, matchActionDuration, type MatchActionKind, type MatchActionSignal } from './game/matchActionEvents';
 import { I18nProvider, useI18n } from './i18n/I18nProvider';
 import { MahjongTable3D } from './MahjongTable3D';
@@ -484,14 +484,23 @@ function OnlineModal({ runtime, progress, onBgmScene, onClose }: { runtime: Plat
   </Modal>;
 }
 
-function claimLabel(option: ClaimOption, t: ReturnType<typeof useI18n>['t']): string {
-  const name = t(`single.claim.${option.kind}`);
-  return option.kind === 'chi' ? `${name} · ${option.tiles.map(tileLabel).join(' ')}` : name;
+function ClaimTileSet({ runtime, tiles }: { runtime: PlatformRuntime; tiles: TileId[] }) {
+  const shell = runtime.resolveAsset(ASSETS.tileShell);
+  return <span className="claim-tile-set" aria-hidden="true">
+    {tiles.map((tile, index) => <span
+      className="claim-option-tile"
+      key={`${tile}-${index}`}
+      style={{ '--claim-tile-shell': `url("${shell}")` } as CSSProperties}
+    >
+      <img src={runtime.resolveAsset(tileFaceAsset(tile))} alt="" />
+    </span>)}
+  </span>;
 }
 
 type ResultStage = 'cutin' | 'score' | 'coins' | null;
 type QueuedMatchAction = MatchActionSignal & { id: number };
 type MatchUtilityPanel = 'emote' | 'help' | null;
+type ClaimChoice = { source: 'discard'; kind: MeldKind } | { source: 'kong'; kind: 'kong' } | null;
 type MatchEmoteBurst = {
   id: number;
   emote: string;
@@ -504,8 +513,9 @@ type MatchEmoteBurst = {
 };
 
 const MATCH_EMOTES = ['😊', '😄', '😮', '😢', '😤', '🤔', '👏', '✨'] as const;
+const MATCH_STEP_DELAY_MS = 1_500;
 const TAI_HELP_PATTERNS = [
-  ['selfDraw', '1'], ['closed', '1'], ['closedSelfDrawBonus', '1'], ['ready', '1'],
+  ['selfDraw', '1'], ['closed', '1'], ['closedSelfDrawBonus', '3'], ['ready', '1'],
   ['flowers', '×1'], ['allTriplets', '4'], ['allHonors', '16'], ['halfFlush', '4'],
   ['fullFlush', '8'], ['bigThreeDragons', '8'], ['smallThreeDragons', '4'],
   ['redDragon', '1'], ['greenDragon', '1'], ['whiteDragon', '1'], ['seatWind', '1'], ['roundWind', '1'],
@@ -529,6 +539,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
   const [actionQueue, setActionQueue] = useState<QueuedMatchAction[]>([]);
   const [utilityPanel, setUtilityPanel] = useState<MatchUtilityPanel>(null);
   const [autoPlayEnabled, setAutoPlayEnabled] = useState(false);
+  const [claimChoice, setClaimChoice] = useState<ClaimChoice>(null);
   const [emoteBursts, setEmoteBursts] = useState<MatchEmoteBurst[]>([]);
   const [lowBalanceEntry] = useState(() => progress.coins < LOW_BALANCE_THRESHOLD);
   const discardSoundCount = useRef(0);
@@ -541,6 +552,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
   const readyBgmActive = state.readyDeclared.some(Boolean);
   const completedDiscardCount = state.players.reduce((count, hand) => count + hand.discards.length + hand.melds.filter((meld) => !meld.concealed).length, 0);
   const turnToken = [state.currentPlayer, state.phase, state.wall.length, state.pendingDiscard?.player ?? '-', state.pendingDiscard?.tile ?? '-', activeHand?.concealed.length ?? 0, activeHand?.melds.length ?? 0, activeHand?.discards.length ?? 0].join(':');
+  useEffect(() => { setClaimChoice(null); }, [turnToken]);
   useEffect(() => {
     setSecondsLeft(TURN_TIME_SECONDS);
     if (state.settlement || actionLocked) return;
@@ -557,7 +569,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
       if (current.settlement) return current;
       const stillAutoPlaying = current.currentPlayer !== 0 || autoPlayEnabled || current.readyDeclared[0];
       return stillAutoPlaying ? autoPlayCurrentTurn(current) : current;
-    }), state.currentPlayer === 0 ? 320 : 620);
+    }), MATCH_STEP_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [actionLocked, autoPlayEnabled, state]);
   useEffect(() => {
@@ -596,8 +608,18 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
     if (state.winner === null) setResultStage('score');
   }, [state.settlement]);
   const player = state.players[0];
-  const kongs = useMemo(() => concealedKongTiles(state, 0), [state]);
+  const kongs = useMemo(() => kongTiles(state, 0), [state]);
   const readyOptions = useMemo(() => readyDiscardIndices(state, 0), [state]);
+  const discardClaimGroups = useMemo(() => {
+    const groups = new Map<MeldKind, { option: ClaimOption; index: number }[]>();
+    state.claimOptions.forEach((option, index) => {
+      if (option.kind === 'win') return;
+      const choices = groups.get(option.kind) ?? [];
+      choices.push({ option, index });
+      groups.set(option.kind, choices);
+    });
+    return groups;
+  }, [state.claimOptions]);
   const selectedSkin = CHARACTER_SKINS.find((skin) => skin.id === progress.selectedCharacterSkin) ?? CHARACTER_SKINS[0];
   const winnerSkinId = state.winner === 0 ? selectedSkin.id : state.winner === null ? selectedSkin.id : AI_CHARACTER_SKINS[state.winner];
   const winnerSkin = CHARACTER_SKINS.find((skin) => skin.id === winnerSkinId) ?? selectedSkin;
@@ -639,6 +661,21 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
     }
     setState((current) => discardTile(current, index));
   };
+  const requestDiscardClaim = (kind: MeldKind) => {
+    const choices = discardClaimGroups.get(kind) ?? [];
+    if (choices.length === 1) {
+      setState((current) => claimDiscard(current, choices[0].index));
+      return;
+    }
+    if (choices.length > 1) setClaimChoice({ source: 'discard', kind });
+  };
+  const requestKong = () => {
+    if (kongs.length === 1) {
+      setState((current) => declareKong(current, kongs[0]));
+      return;
+    }
+    if (kongs.length > 1) setClaimChoice({ source: 'kong', kind: 'kong' });
+  };
   const restart = () => {
     const nextState = createInitialState();
     previousActionState.current = nextState;
@@ -646,6 +683,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
     setActionQueue([]);
     setResultStage(null);
     setReadyMode(false);
+    setClaimChoice(null);
     setCoinDelta(0);
     playMahjongSfx('tileArrange');
   };
@@ -653,7 +691,10 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
     const nextEnabled = !autoPlayEnabled;
     setAutoPlayEnabled(nextEnabled);
     setUtilityPanel(null);
-    if (nextEnabled) setReadyMode(false);
+    if (nextEnabled) {
+      setReadyMode(false);
+      setClaimChoice(null);
+    }
   };
   const chooseEmote = (emote: string, seat: MatchEmoteBurst['seat'] = 0) => {
     const spread = () => Math.round((Math.random() - .5) * 18);
@@ -690,6 +731,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
         <MahjongTable3D
           runtime={runtime}
           state={state}
+          floorTexturePath={floorBackgroundForOutfit(selectedSkin.outfitNumber)}
           tableTexturePath={selectedTable.relativePath}
           tileBackTexturePath={selectedTileBack.relativePath}
           participantNames={participantNames}
@@ -708,11 +750,25 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
           } : undefined}
           onPlayerTileClick={handlePlayerTileClick}
         />
-        {(state.phase === 'claim' || kongs.length > 0 || readyOptions.length > 0 || readyMode) && !autoPlayEnabled && !state.settlement && !actionLocked && <div className="match-action-bar">
-          {state.phase === 'claim' && state.claimOptions.map((option, index) => <button className={`call-button call-${option.kind}`} key={`${option.kind}-${index}`} onClick={() => setState((current) => claimDiscard(current, index))}>{claimLabel(option, t)}</button>)}
-          {state.phase === 'claim' && <button className="call-button call-pass" onClick={() => setState(passClaim)}>{t('single.claim.pass')}</button>}
-          {state.phase === 'discard' && kongs.map((tile) => <button className="call-button call-kong" key={tile} onClick={() => setState((current) => declareConcealedKong(current, tile))}>{t('single.claim.kong')} · {tileLabel(tile)}</button>)}
-          {state.phase === 'discard' && readyOptions.length > 0 && <button className={`call-button call-ready ${readyMode ? 'active' : ''}`} onClick={() => setReadyMode((active) => !active)}>{readyMode ? t('action.cancel') : t('single.declareReady')}</button>}
+        {(state.phase === 'claim' || kongs.length > 0 || readyOptions.length > 0 || readyMode) && !autoPlayEnabled && !state.settlement && !actionLocked && <div className={`match-action-bar ${claimChoice ? 'choosing-meld' : ''}`}>
+          {claimChoice?.source === 'discard' && (discardClaimGroups.get(claimChoice.kind) ?? []).map(({ option, index }) => <button
+            className="claim-option-button"
+            key={`${claimChoice.kind}-${index}`}
+            aria-label={`${t(`single.claim.${claimChoice.kind}`)} ${option.tiles.map(tileLabel).join(' ')}`}
+            onClick={() => setState((current) => claimDiscard(current, index))}
+          ><ClaimTileSet runtime={runtime} tiles={option.tiles} /></button>)}
+          {claimChoice?.source === 'kong' && kongs.map((tile) => <button
+            className="claim-option-button"
+            key={tile}
+            aria-label={`${t('single.claim.kong')} ${tileLabel(tile)}`}
+            onClick={() => setState((current) => declareKong(current, tile))}
+          ><ClaimTileSet runtime={runtime} tiles={[tile, tile, tile, tile]} /></button>)}
+          {claimChoice && <button className="call-button call-pass" onClick={() => setClaimChoice(null)}>{t('action.cancel')}</button>}
+          {!claimChoice && state.phase === 'claim' && state.claimOptions.map((option, index) => option.kind === 'win' && <button className="call-button call-win" key={`win-${index}`} onClick={() => setState((current) => claimDiscard(current, index))}>{t('single.claim.win')}</button>)}
+          {!claimChoice && state.phase === 'claim' && [...discardClaimGroups.keys()].map((kind) => <button className={`call-button call-${kind}`} key={kind} onClick={() => requestDiscardClaim(kind)}>{t(`single.claim.${kind}`)}</button>)}
+          {!claimChoice && state.phase === 'claim' && <button className="call-button call-pass" onClick={() => setState(passClaim)}>{t('single.claim.pass')}</button>}
+          {!claimChoice && state.phase === 'discard' && kongs.length > 0 && <button className="call-button call-kong" onClick={requestKong}>{t('single.claim.kong')}</button>}
+          {!claimChoice && state.phase === 'discard' && readyOptions.length > 0 && <button className={`call-button call-ready ${readyMode ? 'active' : ''}`} onClick={() => setReadyMode((active) => !active)}>{readyMode ? t('action.cancel') : t('single.declareReady')}</button>}
         </div>}
         <div className="match-emote-flight-layer" aria-live="polite">
           {emoteBursts.map((burst) => <span

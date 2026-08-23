@@ -9,16 +9,21 @@ export interface ClaimOption { kind: ClaimKind; consume: TileId[]; tiles: TileId
 export interface TaiPattern { id: string; tai: number; }
 export interface TaiResult { total: number; patterns: TaiPattern[]; }
 export interface HandSettlement { reason: 'win' | 'draw'; tai: number; patterns: TaiPattern[]; deltas: number[]; bankruptPlayer: number | null; }
+export type LastTileFocus =
+  | { area: 'river'; seat: number; tile: TileId }
+  | { area: 'meld'; seat: number; tile: TileId; meldIndex: number; tileIndex: number }
+  | { area: 'selfDraw'; seat: number; tile: TileId };
 export interface MahjongState {
   players: PlayerHand[]; wall: TileId[]; currentPlayer: number;
   winner: number | null; winnerBy: 'selfDraw' | 'discard' | null; loser: number | null; exhausted: boolean;
   phase: 'discard' | 'claim'; pendingDiscard: { player: number; tile: TileId } | null; claimOptions: ClaimOption[];
-  lastDrawn: TileId | null; points: number[]; readyDeclared: boolean[]; settlement: HandSettlement | null;
+  lastDrawn: TileId | null; lastTileFocus: LastTileFocus | null;
+  points: number[]; readyDeclared: boolean[]; settlement: HandSettlement | null;
 }
 
 export const INITIAL_POINTS = 25_000;
 export const BASE_PAYMENT = 500;
-export const PAYMENT_PER_TAI = 250;
+export const PAYMENT_PER_TAI = 200;
 
 const SUITED: TileId[] = (['m', 'p', 's'] as const).flatMap((suit) => Array.from({ length: 9 }, (_, index) => `${suit}${index + 1}` as TileId));
 const WINDS: TileId[] = Array.from({ length: 4 }, (_, index) => `w${index + 1}` as TileId);
@@ -80,9 +85,11 @@ function scoreShape(hand: PlayerHand, shape: WinningShape, options: { selfDraw: 
   // The base stake is handled by BASE_PAYMENT and is not counted as a tai.
   const patterns: TaiPattern[] = [];
   const closed = hand.melds.every((meld) => meld.concealed);
-  if (options.selfDraw) patterns.push({ id: 'selfDraw', tai: 1 });
-  if (closed) patterns.push({ id: 'closed', tai: 1 });
-  if (closed && options.selfDraw) patterns.push({ id: 'closedSelfDrawBonus', tai: 1 });
+  if (closed && options.selfDraw) patterns.push({ id: 'closedSelfDrawBonus', tai: 3 });
+  else {
+    if (options.selfDraw) patterns.push({ id: 'selfDraw', tai: 1 });
+    if (closed) patterns.push({ id: 'closed', tai: 1 });
+  }
   if (options.ready) patterns.push({ id: 'ready', tai: 1 });
   if (hand.flowers.length) patterns.push({ id: 'flowers', tai: hand.flowers.length });
   const melds = [...shape.melds, ...hand.melds.map((meld) => ({ kind: meld.kind === 'chi' ? 'sequence' as const : 'triplet' as const, tiles: meld.tiles }))];
@@ -115,9 +122,11 @@ function applyWinSettlement(state: MahjongState, winner: number, by: 'selfDraw' 
   const deltas = [0, 0, 0, 0];
   const charge = (payer: number, requested: number) => { const actual = Math.min(state.points[payer], requested); deltas[payer] -= actual; deltas[winner] += actual; };
   if (by === 'selfDraw') for (let player = 0; player < 4; player += 1) { if (player !== winner) charge(player, payment); }
-  else if (loser !== null) charge(loser, payment * 3);
+  else if (loser !== null) charge(loser, payment);
   state.points = state.points.map((points, index) => Math.max(0, points + deltas[index]));
   state.winner = winner; state.winnerBy = by; state.loser = loser; state.phase = 'discard'; state.claimOptions = [];
+  const selfDrawTile = winningTile ?? state.lastDrawn;
+  if (by === 'selfDraw' && selfDrawTile) state.lastTileFocus = { area: 'selfDraw', seat: winner, tile: selfDrawTile };
   const bankrupt = state.points.findIndex((points) => points === 0);
   state.settlement = { reason: 'win', tai: result.total, patterns: result.patterns, deltas, bankruptPlayer: bankrupt < 0 ? null : bankrupt };
 }
@@ -130,7 +139,7 @@ export function createInitialState(random: () => number = Math.random, initialPo
   const dealerTile = dealPool.pop() ?? null; if (dealerTile) players[0].concealed.push(dealerTile);
   const state: MahjongState = {
     players, wall: shuffleTiles([...dealPool, ...flowers], random), currentPlayer: 0, winner: null, winnerBy: null, loser: null, exhausted: false,
-    phase: 'discard', pendingDiscard: null, claimOptions: [], lastDrawn: dealerTile,
+    phase: 'discard', pendingDiscard: null, claimOptions: [], lastDrawn: dealerTile, lastTileFocus: null,
     points: initialPoints.map((points) => Math.max(0, Math.floor(points))), readyDeclared: [false, false, false, false], settlement: null,
   };
   if (isWinningHand(players[0].concealed)) applyWinSettlement(state, 0, 'selfDraw', null);
@@ -155,7 +164,7 @@ export function getClaimOptions(state: MahjongState, playerIndex: number): Claim
   const copies = countTile(hand.concealed, tile);
   if (copies >= 3 && state.wall.length > 8) options.push({ kind: 'kong', consume: [tile, tile, tile], tiles: [tile, tile, tile, tile] });
   if (copies >= 2) options.push({ kind: 'pong', consume: [tile, tile], tiles: [tile, tile, tile] });
-  if (playerIndex === (pending.player + 1) % 4) options.push(...chiOptions(hand.concealed, tile));
+  if (playerIndex === nextPlayer(pending.player)) options.push(...chiOptions(hand.concealed, tile));
   return options;
 }
 function removeTiles(hand: TileId[], targets: TileId[]) { targets.forEach((target) => { const index = hand.indexOf(target); if (index >= 0) hand.splice(index, 1); }); }
@@ -170,23 +179,27 @@ function drawForPlayer(state: MahjongState, player: number) {
   if (isWinningHand(hand.concealed, hand.melds.length)) applyWinSettlement(state, player, 'selfDraw', null);
 }
 function advanceAfterDiscard(state: MahjongState) {
-  const discarder = state.pendingDiscard?.player ?? state.currentPlayer; state.pendingDiscard = null; state.claimOptions = []; state.phase = 'discard'; state.currentPlayer = (discarder + 1) % 4; drawForPlayer(state, state.currentPlayer);
+  const discarder = state.pendingDiscard?.player ?? state.currentPlayer; state.pendingDiscard = null; state.claimOptions = []; state.phase = 'discard'; state.currentPlayer = nextPlayer(discarder); drawForPlayer(state, state.currentPlayer);
 }
 function applyMeldClaim(state: MahjongState, player: number, option: ClaimOption) {
   const pending = state.pendingDiscard; if (!pending) return; const hand = state.players[player]; removeTiles(hand.concealed, option.consume);
   const pile = state.players[pending.player].discards; if (pile.at(-1) === pending.tile) pile.pop();
+  const meldIndex = hand.melds.length;
+  const tileIndex = Math.max(0, option.tiles.indexOf(pending.tile));
   hand.melds.push({ kind: option.kind as MeldKind, tiles: option.tiles, fromPlayer: pending.player, concealed: false }); hand.concealed = sortTiles(hand.concealed);
+  state.lastTileFocus = { area: 'meld', seat: player, tile: pending.tile, meldIndex, tileIndex };
   state.currentPlayer = player; state.pendingDiscard = null; state.claimOptions = []; state.phase = 'discard'; state.lastDrawn = null; if (option.kind === 'kong') drawForPlayer(state, player);
 }
-function clockwisePlayers(discarder: number): number[] { return [1, 2, 3].map((offset) => (discarder + offset) % 4); }
+function nextPlayer(player: number): number { return (player + 3) % 4; }
+function counterclockwisePlayers(discarder: number): number[] { return [1, 2, 3].map((offset) => (discarder - offset + 4) % 4); }
 function resolvePendingClaims(state: MahjongState, skipped: Set<number> = new Set()) {
   const pending = state.pendingDiscard; if (!pending) return;
-  const ordered = clockwisePlayers(pending.player).filter((player) => !skipped.has(player)); const byPlayer = new Map(ordered.map((player) => [player, getClaimOptions(state, player)]));
+  const ordered = counterclockwisePlayers(pending.player).filter((player) => !skipped.has(player)); const byPlayer = new Map(ordered.map((player) => [player, getClaimOptions(state, player)]));
   const winner = ordered.find((player) => byPlayer.get(player)?.some((option) => option.kind === 'win'));
   if (winner !== undefined) { if (winner === 0) { state.currentPlayer = 0; state.phase = 'claim'; state.claimOptions = byPlayer.get(0)!.filter((option) => option.kind === 'win'); } else finishDiscardWin(state, winner); return; }
   const setPlayer = ordered.find((player) => byPlayer.get(player)?.some((option) => option.kind === 'kong' || option.kind === 'pong'));
   if (setPlayer !== undefined) { const options = byPlayer.get(setPlayer)!.filter((option) => option.kind === 'kong' || option.kind === 'pong'); if (setPlayer === 0) { state.currentPlayer = 0; state.phase = 'claim'; state.claimOptions = options; } else applyMeldClaim(state, setPlayer, options.find((option) => option.kind === 'kong') ?? options[0]); return; }
-  const next = (pending.player + 1) % 4;
+  const next = nextPlayer(pending.player);
   if (!skipped.has(next)) { const options = (byPlayer.get(next) ?? []).filter((option) => option.kind === 'chi'); if (options.length) { if (next === 0) { state.currentPlayer = 0; state.phase = 'claim'; state.claimOptions = options; } else applyMeldClaim(state, next, options[0]); return; } }
   advanceAfterDiscard(state);
 }
@@ -210,7 +223,9 @@ function discardTileInternal(source: MahjongState, tileIndex: number, declaringR
   const state = structuredClone(source); const player = state.currentPlayer; const hand = state.players[player];
   if (!declaringReady && state.readyDeclared[player] && tileIndex !== hand.concealed.length - 1) return source;
   const [discarded] = hand.concealed.splice(tileIndex, 1); if (!discarded) return source;
-  hand.concealed = sortTiles(hand.concealed); hand.discards.push(discarded); state.lastDrawn = null; state.pendingDiscard = { player, tile: discarded }; resolvePendingClaims(state); return state;
+  hand.concealed = sortTiles(hand.concealed); hand.discards.push(discarded); state.lastDrawn = null;
+  state.lastTileFocus = { area: 'river', seat: player, tile: discarded };
+  state.pendingDiscard = { player, tile: discarded }; resolvePendingClaims(state); return state;
 }
 export function discardTile(source: MahjongState, tileIndex: number): MahjongState { return discardTileInternal(source, tileIndex, false); }
 export function declareReady(source: MahjongState, tileIndex: number): MahjongState {
@@ -228,16 +243,34 @@ export function autoPlayCurrentTurn(source: MahjongState, random: () => number =
   if (source.phase === 'claim' && source.currentPlayer === 0) { const win = source.claimOptions.findIndex((option) => option.kind === 'win'); return win >= 0 ? claimDiscard(source, win) : passClaim(source); }
   if (source.phase !== 'discard') return source; const hand = source.players[source.currentPlayer]?.concealed ?? [];
   if (source.readyDeclared[source.currentPlayer]) return discardTile(source, hand.length - 1);
+  const kongs = kongTiles(source, source.currentPlayer); if (kongs.length) return declareKong(source, kongs[0]);
   const ready = readyDiscardIndices(source, source.currentPlayer); if (ready.length) return declareReady(source, ready[Math.floor(random() * ready.length)] ?? ready[0]);
   return discardTile(source, chooseAiDiscard(hand, random));
 }
-export function concealedKongTiles(state: MahjongState, player: number): TileId[] {
+export function kongTiles(state: MahjongState, player: number): TileId[] {
   if (state.phase !== 'discard' || state.currentPlayer !== player || state.wall.length <= 8 || state.readyDeclared[player]) return [];
-  return STANDARD_TILE_TYPES.filter((tile) => countTile(state.players[player].concealed, tile) === 4);
+  const hand = state.players[player];
+  return STANDARD_TILE_TYPES.filter((tile) => {
+    const concealedCopies = countTile(hand.concealed, tile);
+    const exposedPong = hand.melds.some((meld) => !meld.concealed && meld.kind === 'pong' && meld.tiles[0] === tile);
+    return concealedCopies === 4 || (concealedCopies >= 1 && exposedPong);
+  });
 }
-export function declareConcealedKong(source: MahjongState, tile: TileId): MahjongState {
-  const player = source.currentPlayer; if (!concealedKongTiles(source, player).includes(tile)) return source; const state = structuredClone(source); const hand = state.players[player];
-  removeTiles(hand.concealed, [tile, tile, tile, tile]); hand.concealed = sortTiles(hand.concealed); hand.melds.push({ kind: 'kong', tiles: [tile, tile, tile, tile], fromPlayer: null, concealed: true }); drawForPlayer(state, player); return state;
+export function declareKong(source: MahjongState, tile: TileId): MahjongState {
+  const player = source.currentPlayer; if (!kongTiles(source, player).includes(tile)) return source; const state = structuredClone(source); const hand = state.players[player];
+  const exposedPongIndex = hand.melds.findIndex((meld) => !meld.concealed && meld.kind === 'pong' && meld.tiles[0] === tile);
+  const exposedPong = hand.melds[exposedPongIndex];
+  if (exposedPong) {
+    removeTiles(hand.concealed, [tile]);
+    exposedPong.kind = 'kong';
+    exposedPong.tiles.push(tile);
+    state.lastTileFocus = { area: 'meld', seat: player, tile, meldIndex: exposedPongIndex, tileIndex: exposedPong.tiles.length - 1 };
+  } else {
+    removeTiles(hand.concealed, [tile, tile, tile, tile]);
+    hand.melds.push({ kind: 'kong', tiles: [tile, tile, tile, tile], fromPlayer: null, concealed: true });
+    state.lastTileFocus = { area: 'meld', seat: player, tile, meldIndex: hand.melds.length - 1, tileIndex: 2 };
+  }
+  hand.concealed = sortTiles(hand.concealed); drawForPlayer(state, player); return state;
 }
 export const discardAndAdvance = discardTile;
 export function tileLabel(tile: TileId): string {

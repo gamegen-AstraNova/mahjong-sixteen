@@ -88,37 +88,43 @@
 - 美術來源：依 Asteria、Lumi、Nyx 對應編號的角色造型設計。
 - GameGen 匯入位置：`public/common/textures/`
 - 命名規則：Asset Naming Rule V2；牌背使用 `panel_`，桌面及首頁背景使用 `bg_`。
-- 版面規格：牌背正視 2:3；桌面俯視 16:10 並保留中央低干擾區；首頁背景 16:9 並保留左側角色與右側 UI 安全區。
-- 透明度：本批 57 張均為 RGB PNG，不含透明通道。
+- 版面規格：牌背正視 2:3；桌面為 1:1 正方形並保留中央低干擾區；首頁背景 16:9 並保留左側角色與右側 UI 安全區。
+- 透明度：19 張牌背為 RGB PNG；19 張桌面與 19 張首頁背景為 RGBA PNG。
 - 初始持有：日常牌背、日常桌面；三名角色的日常造型。首頁背景依目前角色造型編號自動切換。
+- 牌背視覺：19 款皆於 2026-08-24 依新版首頁場景重繪為單一主圖騰、低線條密度的簡約版本，並以實際牌牆小尺寸驗收。
 
 | 編號 | 主題 | 牌背檔名 | 尺寸 | 透明 | 桌面檔名 | 尺寸 | 透明 | 首頁背景檔名 | 尺寸 | 透明 |
 |---:|---|---|---:|:---:|---|---:|:---:|---|---:|:---:|
-| 1 | 日常 | `panel_tile_back_daily.png` | 512x768 | 否 | `bg_table_daily.png` | 1600x1000 | 否 | `bg_lobby_daily.png` | 1600x900 | 否 |
-| 2 | 實況 | `panel_tile_back_streaming.png` | 512x768 | 否 | `bg_table_streaming.png` | 1600x1000 | 否 | `bg_lobby_streaming.png` | 1600x900 | 否 |
-| 3 | 外出 | `panel_tile_back_outing.png` | 512x768 | 否 | `bg_table_outing.png` | 1600x1000 | 否 | `bg_lobby_outing.png` | 1600x900 | 否 |
-| 4 | 渡假 | `panel_tile_back_vacation.png` | 512x768 | 否 | `bg_table_vacation.png` | 1600x1000 | 否 | `bg_lobby_vacation.png` | 1600x900 | 否 |
-| 5 | 泳裝 | `panel_tile_back_swimsuit.png` | 512x768 | 否 | `bg_table_swimsuit.png` | 1600x1000 | 否 | `bg_lobby_swimsuit.png` | 1600x900 | 否 |
-| 6 | 制服 | `panel_tile_back_uniform.png` | 512x768 | 否 | `bg_table_uniform.png` | 1600x1000 | 否 | `bg_lobby_uniform.png` | 1600x900 | 否 |
-| 7 | 魔法學院 | `panel_tile_back_magic_academy.png` | 512x768 | 否 | `bg_table_magic_academy.png` | 1600x1000 | 否 | `bg_lobby_magic_academy.png` | 1600x900 | 否 |
-| 8 | 古典女僕 | `panel_tile_back_classic_maid.png` | 512x768 | 否 | `bg_table_classic_maid.png` | 1600x1000 | 否 | `bg_lobby_classic_maid.png` | 1600x900 | 否 |
-| 9 | 現代女僕 | `panel_tile_back_modern_maid.png` | 512x768 | 否 | `bg_table_modern_maid.png` | 1600x1000 | 否 | `bg_lobby_modern_maid.png` | 1600x900 | 否 |
-| 10 | 服務生 | `panel_tile_back_waiter.png` | 512x768 | 否 | `bg_table_waiter.png` | 1600x1000 | 否 | `bg_lobby_waiter.png` | 1600x900 | 否 |
-| 11 | 舞者 | `panel_tile_back_dancer.png` | 512x768 | 否 | `bg_table_dancer.png` | 1600x1000 | 否 | `bg_lobby_dancer.png` | 1600x900 | 否 |
-| 12 | 啦啦隊 | `panel_tile_back_cheerleader.png` | 512x768 | 否 | `bg_table_cheerleader.png` | 1600x1000 | 否 | `bg_lobby_cheerleader.png` | 1600x900 | 否 |
-| 13 | 歌手 | `panel_tile_back_singer.png` | 512x768 | 否 | `bg_table_singer.png` | 1600x1000 | 否 | `bg_lobby_singer.png` | 1600x900 | 否 |
-| 14 | 偶像 | `panel_tile_back_idol.png` | 512x768 | 否 | `bg_table_idol.png` | 1600x1000 | 否 | `bg_lobby_idol.png` | 1600x900 | 否 |
-| 15 | 魔法少女 | `panel_tile_back_magical_girl.png` | 512x768 | 否 | `bg_table_magical_girl.png` | 1600x1000 | 否 | `bg_lobby_magical_girl.png` | 1600x900 | 否 |
-| 16 | 護理 | `panel_tile_back_nursing.png` | 512x768 | 否 | `bg_table_nursing.png` | 1600x1000 | 否 | `bg_lobby_nursing.png` | 1600x900 | 否 |
-| 17 | 冒險者 | `panel_tile_back_adventurer.png` | 512x768 | 否 | `bg_table_adventurer.png` | 1600x1000 | 否 | `bg_lobby_adventurer.png` | 1600x900 | 否 |
-| 18 | 賽車 | `panel_tile_back_racing.png` | 512x768 | 否 | `bg_table_racing.png` | 1600x1000 | 否 | `bg_lobby_racing.png` | 1600x900 | 否 |
-| 19 | 古裝 | `panel_tile_back_historical.png` | 512x768 | 否 | `bg_table_historical.png` | 1600x1000 | 否 | `bg_lobby_historical.png` | 1600x900 | 否 |
+| 1 | 日常 | `panel_tile_back_daily.png` | 512x768 | 否 | `bg_table_daily.png` | 1000x1000 | 是 | `bg_lobby_daily.png` | 1600x900 | 是 |
+| 2 | 實況 | `panel_tile_back_streaming.png` | 512x768 | 否 | `bg_table_streaming.png` | 1000x1000 | 是 | `bg_lobby_streaming.png` | 1600x900 | 是 |
+| 3 | 外出 | `panel_tile_back_outing.png` | 512x768 | 否 | `bg_table_outing.png` | 1000x1000 | 是 | `bg_lobby_outing.png` | 1600x900 | 是 |
+| 4 | 渡假 | `panel_tile_back_vacation.png` | 512x768 | 否 | `bg_table_vacation.png` | 1000x1000 | 是 | `bg_lobby_vacation.png` | 1600x900 | 是 |
+| 5 | 泳裝 | `panel_tile_back_swimsuit.png` | 512x768 | 否 | `bg_table_swimsuit.png` | 1000x1000 | 是 | `bg_lobby_swimsuit.png` | 1600x900 | 是 |
+| 6 | 制服 | `panel_tile_back_uniform.png` | 512x768 | 否 | `bg_table_uniform.png` | 1000x1000 | 是 | `bg_lobby_uniform.png` | 1600x900 | 是 |
+| 7 | 魔法學院 | `panel_tile_back_magic_academy.png` | 512x768 | 否 | `bg_table_magic_academy.png` | 1000x1000 | 是 | `bg_lobby_magic_academy.png` | 1600x900 | 是 |
+| 8 | 古典女僕 | `panel_tile_back_classic_maid.png` | 512x768 | 否 | `bg_table_classic_maid.png` | 1000x1000 | 是 | `bg_lobby_classic_maid.png` | 1600x900 | 是 |
+| 9 | 現代女僕 | `panel_tile_back_modern_maid.png` | 512x768 | 否 | `bg_table_modern_maid.png` | 1000x1000 | 是 | `bg_lobby_modern_maid.png` | 1600x900 | 是 |
+| 10 | 服務生 | `panel_tile_back_waiter.png` | 512x768 | 否 | `bg_table_waiter.png` | 1000x1000 | 是 | `bg_lobby_waiter.png` | 1600x900 | 是 |
+| 11 | 舞者 | `panel_tile_back_dancer.png` | 512x768 | 否 | `bg_table_dancer.png` | 1000x1000 | 是 | `bg_lobby_dancer.png` | 1600x900 | 是 |
+| 12 | 啦啦隊 | `panel_tile_back_cheerleader.png` | 512x768 | 否 | `bg_table_cheerleader.png` | 1000x1000 | 是 | `bg_lobby_cheerleader.png` | 1600x900 | 是 |
+| 13 | 歌手 | `panel_tile_back_singer.png` | 512x768 | 否 | `bg_table_singer.png` | 1000x1000 | 是 | `bg_lobby_singer.png` | 1600x900 | 是 |
+| 14 | 偶像 | `panel_tile_back_idol.png` | 512x768 | 否 | `bg_table_idol.png` | 1000x1000 | 是 | `bg_lobby_idol.png` | 1600x900 | 是 |
+| 15 | 魔法少女 | `panel_tile_back_magical_girl.png` | 512x768 | 否 | `bg_table_magical_girl.png` | 1000x1000 | 是 | `bg_lobby_magical_girl.png` | 1600x900 | 是 |
+| 16 | 護理 | `panel_tile_back_nursing.png` | 512x768 | 否 | `bg_table_nursing.png` | 1000x1000 | 是 | `bg_lobby_nursing.png` | 1600x900 | 是 |
+| 17 | 冒險者 | `panel_tile_back_adventurer.png` | 512x768 | 否 | `bg_table_adventurer.png` | 1000x1000 | 是 | `bg_lobby_adventurer.png` | 1600x900 | 是 |
+| 18 | 賽車 | `panel_tile_back_racing.png` | 512x768 | 否 | `bg_table_racing.png` | 1000x1000 | 是 | `bg_lobby_racing.png` | 1600x900 | 是 |
+| 19 | 古裝 | `panel_tile_back_historical.png` | 512x768 | 否 | `bg_table_historical.png` | 1000x1000 | 是 | `bg_lobby_historical.png` | 1600x900 | 是 |
+
+## 2026-08-24 牌背重製
+
+- 使用 Codex 內建 ImageGen，以 19 張新版首頁背景與遊戲 Logo 作為配色、主題及美術語言參考。
+- 每款只保留一個主要概念圖騰與少量大色塊，避免牌牆縮圖出現密集線條、鋸齒與雜訊。
+- 19 張正式牌背均直接取代原路徑，不保留舊版、候選圖或第二套程式／樣式來源。
 
 ## 2026-08-22 美術修訂
 
 - 依回饋替換 10 張素材：古典女僕桌面、服務生首頁背景、舞者桌面、歌手牌背／桌面／首頁背景、護理首頁背景、賽車牌背／桌面／首頁背景。
 - 被取代的舊版素材已刪除；`public/common/textures/` 只保留目前正式版本。
-- 第 11 張回饋截圖與第 10 張為同一個 `bg_lobby_racing.png`；第 12 張 `panel_tile_back_historical.png` 未列入修改並保持原樣。
 
 # 麻將牌正面與抽獎卡背
 
@@ -183,3 +189,15 @@
 
 - GameGen 匯入位置：`public/common/textures/`
 - 保留項目：所有抽獎機率、免費十抽、保底、剩餘數量、按鈕 hitbox、語系文字與獎勵揭示流程。
+
+# 牌局地板
+
+## 2026-08-24 正式主題地板
+
+| 數量 | 最終檔名 | 尺寸／比例 | 透明 | 用途 | 切換來源 |
+|---:|---|---:|:---:|---|---|
+| 19 | `bg_floor_<theme>.webp` | 2048x1152，16:9 | 否 | 3D 牌桌畫布後方的完整地板場景 | 目前套用角色造型的 `outfitNumber`，與首頁背景共用同一主題鍵值 |
+
+- 主題鍵值依序為：`daily`、`streaming`、`outing`、`vacation`、`swimsuit`、`uniform`、`magic_academy`、`classic_maid`、`modern_maid`、`waiter`、`dancer`、`cheerleader`、`singer`、`idol`、`magical_girl`、`nursing`、`adventurer`、`racing`、`historical`。
+- GameGen 匯入位置：`public/common/textures/`；全部為 lossless WebP，原始素材無透明通道。
+- 地板與玩家自行選擇的桌面配置互相獨立：地板跟隨角色造型主題，正方桌面仍跟隨 `selectedTable`。

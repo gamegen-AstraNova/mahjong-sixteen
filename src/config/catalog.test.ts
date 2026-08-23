@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHARACTER_IDS, CHARACTER_SKINS, DEFAULT_PROGRESS, OUTFIT_THEME_SLUGS, TABLES, TILE_BACKS, lobbyBackgroundForOutfit } from './catalog';
+import { CHARACTER_IDS, CHARACTER_SKINS, DEFAULT_PROGRESS, OUTFIT_THEME_SLUGS, TABLES, TILE_BACKS, floorBackgroundForOutfit, lobbyBackgroundForOutfit } from './catalog';
 
 describe('character catalog', () => {
   it('registers nineteen unique GameGen assets for each character', () => {
@@ -18,7 +18,7 @@ describe('character catalog', () => {
     expect(DEFAULT_PROGRESS.ownedCharacterSkins).toEqual(['aya_1', 'mio_1', 'sora_1']);
   });
 
-  it('registers nineteen theme-linked tile backs, tables, and lobby backgrounds', () => {
+  it('registers nineteen theme-linked tile backs, tables, lobby backgrounds, and match floors', () => {
     expect(TILE_BACKS).toHaveLength(19);
     expect(TABLES).toHaveLength(19);
     expect(new Set(TILE_BACKS.map((item) => item.relativePath)).size).toBe(19);
@@ -28,6 +28,7 @@ describe('character catalog', () => {
       expect(TILE_BACKS[index].relativePath).toBe(`textures/panel_tile_back_${theme}.png`);
       expect(TABLES[index].relativePath).toBe(`textures/bg_table_${theme}.png`);
       expect(lobbyBackgroundForOutfit(index + 1)).toBe(`textures/bg_lobby_${theme}.png`);
+      expect(floorBackgroundForOutfit(index + 1)).toBe(`textures/bg_floor_${theme}.webp`);
     });
   });
 

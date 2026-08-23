@@ -26,6 +26,15 @@ describe('match action signals', () => {
     expect(detectMatchActionSignals(current, current)).toEqual([]);
   });
 
+  it('reports an exposed pong upgraded to a kong', () => {
+    const previous = createInitialState(() => 0.42);
+    previous.players[1].melds.push({ kind: 'pong', tiles: ['p5', 'p5', 'p5'], fromPlayer: 0, concealed: false });
+    const current = structuredClone(previous);
+    current.players[1].melds[0] = { kind: 'kong', tiles: ['p5', 'p5', 'p5', 'p5'], fromPlayer: 0, concealed: false };
+
+    expect(detectMatchActionSignals(previous, current)).toEqual([{ seat: 1, kind: 'kong' }]);
+  });
+
   it('holds ordinary calls for one second and winning calls for 2.5 seconds', () => {
     expect(matchActionDuration('chi')).toBe(1_000);
     expect(matchActionDuration('ready')).toBe(1_000);

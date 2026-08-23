@@ -55,9 +55,18 @@ export const TABLES: EquipmentItem[] = OUTFIT_THEME_SLUGS.map((theme, index) => 
   relativePath: `textures/bg_table_${theme}.png`,
 }));
 
+function themeForOutfit(outfitNumber: number): typeof OUTFIT_THEME_SLUGS[number] {
+  return OUTFIT_THEME_SLUGS[outfitNumber - 1] ?? OUTFIT_THEME_SLUGS[0];
+}
+
 export function lobbyBackgroundForOutfit(outfitNumber: number): string {
-  const theme = OUTFIT_THEME_SLUGS[outfitNumber - 1] ?? OUTFIT_THEME_SLUGS[0];
+  const theme = themeForOutfit(outfitNumber);
   return `textures/bg_lobby_${theme}.png`;
+}
+
+export function floorBackgroundForOutfit(outfitNumber: number): string {
+  const theme = themeForOutfit(outfitNumber);
+  return `textures/bg_floor_${theme}.webp`;
 }
 
 export interface UiThemePalette {
