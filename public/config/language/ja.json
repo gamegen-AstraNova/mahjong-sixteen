@@ -1,0 +1,128 @@
+{
+  "app": { "title": "麻將十六張", "subtitle": "AstraNova" },
+  "home": {
+    "offline": "ソロ", "online": "オンライン", "onlineComing": "サーバー接続用インターフェースを準備済みです。後日公開します。",
+    "coins": "所持コイン", "hideUi": "UIを隠す", "showUi": "UIを表示",
+    "rerollLine": "キャラを押して別の台詞を聞く",
+    "line": {
+      "aya": {
+        "1": "お茶の準備はできています。座って、何局かご一緒しませんか？",
+        "2": "今日は牌卓も穏やかですね。ゆっくり考えるのにぴったりです。",
+        "3": "急いで捨てないで。あなたがどう組み立てるのか見ていたいの。",
+        "4": "疲れたなら、先にお茶をどうぞ。牌卓は逃げませんから。",
+        "5": "良い手には忍耐が必要です。お茶がゆっくり味わいを増すように。",
+        "6": "あなたが相手でも、この一局は手加減しませんよ。",
+        "7": "顔に手牌が全部書いてありますよ……冗談です。",
+        "8": "私が今、どの牌を引きたいか当ててみますか？",
+        "9": "勝ち負けは大事じゃない？ ふふ、私に勝ってから言ってください。",
+        "10": "もう一局どうですか？ あなたの打ち方をもっと見たいです。"
+      },
+      "mio": {
+        "1": "……来た？ 座って。静かに打つのも悪くない。",
+        "2": "話さなくていい。牌を見れば、考えていることは分かる。",
+        "3": "それは切らないほうが……いや、何でもない。",
+        "4": "迷いすぎ。牌卓は待ってくれない。",
+        "5": "今日は普通のツキ。ちょうどいい、判断で勝つ。",
+        "6": "こっちを見ないで。自分の牌を見て。",
+        "7": "勝ちたいなら集中して。二度は言わない。",
+        "8": "……少し面白くなってきた。続けて。",
+        "9": "引く前に何を切るか決めておくと早い。",
+        "10": "また台詞を引くの？ 意外と気が長いね。"
+      },
+      "sora": {
+        "1": "お、来たね。今日は派手に打とうか？",
+        "2": "先に言っとくけど、負けても私の強運のせいにしないでね。",
+        "3": "この牌が残してって言ってるんだよね——たぶん。",
+        "4": "今、私の表情を読もうとしたでしょ？",
+        "5": "ほら、早く早く！ 良い牌は待つのが嫌いなんだから。",
+        "6": "私がツモったら、おいしい飲み物をおごってね。",
+        "7": "緊張しないで。たまたま怪しく笑ってるだけだから。",
+        "8": "この局、もっと刺激的にしようよ。ついて来られる？",
+        "9": "牌卓に偶然なんてないよ。あるのは私の華麗な読みだけ。",
+        "10": "もう一回押す？ いいよ、次は何を言おうかな。"
+      }
+    }
+  },
+  "online": {
+    "defaultName": "プレイヤー", "serverMissing": "共有サーバーのソースには接続済みですが、デプロイ後のサーバーURLが未設定です。",
+    "connectionError": "マルチプレイサーバーに接続できません。", "joinError": "ルームを作成または参加できません。",
+    "nickname": "ニックネーム", "create": "ルーム作成", "refresh": "更新", "roomList": "公開ルーム", "loading": "ルームを読み込み中…",
+    "noRooms": "公開ルームはありません。最初のルームを作成できます。", "unnamedHost": "ホスト", "room": "ルーム", "emptySlot": "空席",
+    "host": "ホスト", "computer": "CPU", "player": "プレイヤー", "waitingPlayer": "参加者待ち", "start": "開始",
+    "startHint": "今すぐ開始できます。空席はCPUが補充します。", "waitHost": "ホストの開始を待っています。",
+    "matchCreated": "サーバーが対局を作成しました。", "ruleEnginePending": "次の段階でサーバー権威型の麻雀ルールエンジンを接続します。現在、未検証のクライアント操作は拒否されます。",
+    "phase": { "waiting": "待機中", "playing": "対局中", "over": "終了" }
+  },
+  "action": {
+    "language": "言語", "sfx": "SE", "bgm": "BGM", "characters": "キャラ", "equipment": "装備",
+    "gacha": "ガチャ", "transfer": "引継", "close": "閉じる", "ownedOnly": "所持", "select": "選択",
+    "selected": "使用中", "cancel": "キャンセル", "confirm": "確認", "copy": "コピー", "copied": "コピー済み", "back": "戻る"
+  },
+  "language": { "title": "言語", "en": "English", "zh-TW": "繁體中文", "zh-CN": "简体中文", "ja": "日本語" },
+  "character": { "title": "キャラ", "aya": "Asteria", "mio": "Lumi", "sora": "Nyx", "outfit": "衣装 {number}", "locked": "未所持" },
+  "equipment": { "title": "装備", "tileBack": "牌の背面", "table": "卓", "style": "スタイル {number}", "locked": "未所持" },
+  "theme": {
+    "daily": "日常", "streaming": "配信", "outing": "お出かけ", "vacation": "バカンス", "swimsuit": "水着",
+    "uniform": "制服", "magic_academy": "魔法学園", "classic_maid": "クラシックメイド", "modern_maid": "モダンメイド",
+    "waiter": "ウェイター", "dancer": "ダンサー", "cheerleader": "チアリーダー", "singer": "シンガー", "idol": "アイドル",
+    "magical_girl": "魔法少女", "nursing": "ナース", "adventurer": "冒険者", "racing": "レーシング", "historical": "古典衣装"
+  },
+  "gacha": {
+    "title": "ガチャ", "remaining": "未獲得報酬：{count}", "collectionProgress": "収集度 {owned}/{total}", "rate": "提供割合", "one": "1回", "ten": "10回",
+    "costOne": "🪙 500", "costTen": "🪙 4,500", "freeTen": "毎日無料10回", "freeUsed": "本日の無料分は使用済み",
+    "insufficient": "🪙が足りません。", "result": "抽選結果", "new": "NEW", "duplicate": "重複 · 250 🪙返還",
+    "revealAll": "すべて表示", "probabilityTitle": "提供割合", "probabilityCharacter": "キャラ衣装：10%",
+    "probabilityTileBack": "牌の背面：20%", "probabilityTable": "卓：20%", "probabilityCoins77": "🪙 77：30%",
+    "probabilityCoins777": "🪙 777：15%", "probabilityCoins7777": "🪙 7,777：5%",
+    "guarantee": "10回抽選では牌の背面または卓が1個以上確定します。同カテゴリ内は均等確率です。",
+    "milestone": "累計 {draws} 回 · 装備選択まで {accessory} 回 · 衣装選択まで {character} 回",
+    "accessoryChoices": "装備選択権：{count}", "characterChoices": "衣装選択権：{count}",
+    "accessoryChoiceTitle": "牌の背面または卓を選択", "characterChoiceTitle": "キャラ衣装を選択",
+    "choiceHint": "未所持の報酬を1つ選んでください。未所持報酬がある間、所持済みの項目は選択できません。",
+    "choiceAllOwned": "このカテゴリはすべて所持済みです。いずれかを選ぶと250 🪙が返還されます。",
+    "choiceOwned": "所持済み", "choiceDuplicateRefund": "選択 · 250 🪙返還", "choiceClaimed": "報酬を受け取りました。",
+    "choiceClaimedDuplicate": "重複報酬を選択し、250 🪙が返還されました。", "choiceUnavailable": "この選択権は利用できません。"
+  },
+  "transfer": {
+    "title": "データ引き継ぎ", "export": "引き継ぎコード", "import": "コードを貼り付け", "placeholder": "ここにコードを貼り付け",
+    "invalid": "引き継ぎコードが無効、または破損しています。", "confirmTitle": "現在の進行状況を上書きしますか？",
+    "confirmBody": "コイン、所持品、設定が置き換わります。この操作は元に戻せません。", "success": "進行状況を読み込みました。"
+  },
+  "daily": { "reward": "デイリー報酬", "claimed": "30,000コインを獲得しました。", "reset": "毎日04:00（UTC+8）更新" },
+  "matchTools": {
+    "label": "対局機能",
+    "emote": { "title": "スタンプ", "send": "{emote}を送信" },
+    "auto": { "enable": "オートを有効にする", "disable": "オートを解除する", "status": "オート中：CPUがこの席を操作しています。" },
+    "help": {
+      "title": "ルール・点数", "rulesTitle": "台湾16枚ルール", "taiTitle": "台数一覧", "scoringTitle": "資金計算",
+      "ruleGoal": "5面子と1雀頭を完成させます。通常の手牌は16枚、ツモ後は17枚です。",
+      "ruleTurn": "1枚ツモって1枚捨てます。30秒以内に操作しない場合はCPUが代行します。",
+      "ruleFlowers": "花牌をツモると直ちに公開し、牌山から補充牌を1枚引きます。",
+      "ruleCalls": "チーは上家の捨て牌のみ。条件を満たせばポン、カン、ロンができます。",
+      "ruleReady": "聴牌宣言後は手牌が固定され、和了牌以外のツモ牌は自動で捨てられます。",
+      "scoringFormula": "各家の支払額＝基本500点＋合計台数×250点。",
+      "scoringDiscard": "ロン：放銃者が支払額の3倍を支払います。",
+      "scoringSelfDraw": "ツモ：他の3家がそれぞれ支払額を支払います。",
+      "scoringCoins": "精算後、局内資金{points}点をコイン1枚に換算します。資金は0未満になりません。"
+    }
+  },
+  "single": {
+    "title": "一人プレイ", "wall": "残り牌：{count}", "yourTurn": "捨てる牌を選んでください。", "computerThinking": "コンピューター思考中…",
+    "exit": "対局を退出", "restart": "新しい一手", "win": "ツモ", "draw": "流局", "winner": "{name}の和了",
+    "you": "あなた", "computer": "コンピューター {number}", "flowers": "花牌", "discards": "捨て牌", "rulesNote": "台湾16枚 · 5面子1雀頭",
+    "rotateTitle": "端末を横向きにしてください", "rotateHint": "麻雀卓は横画面でのみプレイできます。",
+    "claimPrompt": "{tile}が捨てられました。鳴くかスキップしてください。", "turnTime": "残り操作時間：{seconds}秒", "selfDraw": "ツモ", "ron": "ロン",
+    "selfDrawCall": "ツモ！", "ronCall": "ロン！", "declareReady": "聴牌宣言", "readyMarker": "聴",
+    "chooseReadyDiscard": "光っている牌を捨てて聴牌を宣言してください。", "readyAutoDiscard": "聴牌中。ツモ後は手牌を維持します。", "tapToContinue": "タップして続ける",
+    "exhaustiveDraw": "牌山が尽き、流局しました", "taiTotal": "合計台数", "taiUnit": "台", "fundSettlement": "局内資金精算", "bankrupt": "ゼロ",
+    "bankruptcyEnd": "{name} の資金がゼロになったため、対局を終了します。", "confirmSettlement": "精算を確認", "coinProfit": "今回獲得したコイン", "coinLoss": "今回失ったコイン", "coinEven": "コインの増減なし",
+    "coinConversion": "局内資金 {points} 点をコイン1枚に換算", "lowBalancePenalty": "最低入場資金未満の場合、勝利報酬は半分になります。",
+    "tai": { "base": "基本和", "selfDraw": "自摸", "closed": "門前清", "closedSelfDrawBonus": "門清自摸加算", "ready": "聴牌", "flowers": "花牌", "allTriplets": "対々和", "allHonors": "字一色", "halfFlush": "混一色", "fullFlush": "清一色", "bigThreeDragons": "大三元", "smallThreeDragons": "小三元", "redDragon": "紅中刻", "greenDragon": "發財刻", "whiteDragon": "白板刻", "seatWind": "門風刻", "roundWind": "圏風刻" },
+    "winLines": {
+      "aya": { "1": "星の光が、勝利への道を照らしてくれたわ。", "2": "この手の運命は、最初から私の掌の上よ。", "3": "完璧な締めくくり。AstraNovaにふさわしいわ。", "4": "瞬きは禁物。勝負はこの一瞬で決まるの。", "5": "お見事。次も全力で来てちょうだい。" },
+      "mio": { "1": "やった！幸運をぜんぶ受け止めたよ！", "2": "じゃじゃーん！Lumiのキラキラ和了！", "3": "楽しい牌って、自然に集まってくるんだね！", "4": "完成！今の一手、みんな見てた？", "5": "今日も最高に輝いてるよ！" },
+      "sora": { "1": "終わり。あなたたちの牌筋はすべて見えていた。", "2": "夜が落ちる時、勝敗はすでに決まっている。", "3": "運は不要。これは計算の結果にすぎない。", "4": "静かに。勝利そのものに語らせよう。", "5": "詰みだ。次は隙をもっと上手く隠すことね。" }
+    },
+    "claim": { "chi": "チー", "pong": "ポン", "kong": "カン", "win": "和了", "pass": "スキップ" }
+  }
+}

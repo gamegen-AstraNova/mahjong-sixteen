@@ -1,0 +1,15 @@
+{
+  "files": [
+    {
+      "path": "config/generalConfiguration.json",
+      "strategy": "json-merge",
+      "merge": {
+        "isLocal": false,
+        "commonPath": "{{assets.baseUrl}}dist/common/",
+        "serverUrl": ""
+      },
+      "encoding": "utf8",
+      "contentType": "application/json"
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+{
+  "app": { "title": "麻將十六張", "subtitle": "AstraNova" },
+  "home": {
+    "offline": "單機", "online": "連線", "onlineComing": "連線模式已預留伺服器接口，將於後續開放。",
+    "coins": "持有金幣", "hideUi": "隱藏介面", "showUi": "顯示介面",
+    "rerollLine": "點擊角色重新抽選台詞",
+    "line": {
+      "aya": {
+        "1": "茶已經泡好了。坐下來，陪我打幾圈吧？",
+        "2": "今天的牌風很安靜，正適合慢慢思考。",
+        "3": "別急著出牌，我想看看你會怎麼佈局。",
+        "4": "如果累了就先喝口茶，牌桌不會跑掉的。",
+        "5": "好牌需要耐心，就像等一壺茶慢慢回甘。",
+        "6": "這一局，我可不會因為是你就手下留情。",
+        "7": "你的表情把手牌都寫出來了……開玩笑的。",
+        "8": "要不要猜猜，我現在最想摸到哪一張牌？",
+        "9": "輸贏不重要？嗯，等你贏了再說這句吧。",
+        "10": "再來一局吧。我還沒看夠你的打法。"
+      },
+      "mio": {
+        "1": "……來了？坐。安靜打牌也不錯。",
+        "2": "不用說話。牌會告訴我你在想什麼。",
+        "3": "這張不要打……算了，當我沒說。",
+        "4": "你猶豫太久了。牌桌可不等人。",
+        "5": "今天手氣普通。正好靠判斷取勝。",
+        "6": "別盯著我看。看你自己的牌。",
+        "7": "想贏就專心，我不會提醒第二次。",
+        "8": "……這局有點意思。繼續。",
+        "9": "摸牌前先想好要丟什麼，會快很多。",
+        "10": "再抽一句？你還真有耐心。"
+      },
+      "sora": {
+        "1": "喔，你來啦。今天要打得痛快一點？",
+        "2": "先說好，輸了可別怪我手氣太好。",
+        "3": "這張牌在叫我留下它——大概吧。",
+        "4": "你剛才是不是偷看我的表情了？",
+        "5": "快一點快一點，好牌可不喜歡等人。",
+        "6": "要是我自摸，你就請我喝點好喝的。",
+        "7": "別緊張，我只是剛好笑得很可疑而已。",
+        "8": "這局來點刺激的，敢不敢跟？",
+        "9": "牌桌上沒有偶然，只有我漂亮的預判。",
+        "10": "再點一次？好啊，看我還會說什麼。"
+      }
+    }
+  },
+  "online": {
+    "defaultName": "玩家", "serverMissing": "已接上共用伺服器原始碼，但尚未設定部署後的伺服器網址。",
+    "connectionError": "無法連上多人伺服器。", "joinError": "無法建立或加入這個房間。",
+    "nickname": "暱稱", "create": "建立房間", "refresh": "重新整理", "roomList": "公開房間", "loading": "正在讀取房間……",
+    "noRooms": "目前沒有公開房間，可以建立第一間。", "unnamedHost": "房主", "room": "房間", "emptySlot": "空位",
+    "host": "房主", "computer": "電腦", "player": "玩家", "waitingPlayer": "等待玩家加入", "start": "開始",
+    "startHint": "現在即可開始，空位會由電腦自動補足。", "waitHost": "等待房主開始。",
+    "matchCreated": "伺服器已成功建立牌局。", "ruleEnginePending": "下一階段會接入伺服器權威麻將規則核心；目前會拒絕未經驗證的客戶端牌局操作。",
+    "phase": { "waiting": "等待中", "playing": "牌局中", "over": "已結束" }
+  },
+  "action": {
+    "language": "語言", "sfx": "音效", "bgm": "BGM", "characters": "角色", "equipment": "配置",
+    "gacha": "轉蛋", "transfer": "引繼", "close": "關閉", "ownedOnly": "持有", "select": "選擇",
+    "selected": "使用中", "cancel": "取消", "confirm": "確認", "copy": "複製", "copied": "已複製", "back": "返回"
+  },
+  "language": { "title": "語言", "en": "English", "zh-TW": "繁體中文", "zh-CN": "簡體中文", "ja": "日本語" },
+  "character": { "title": "角色", "aya": "Asteria", "mio": "Lumi", "sora": "Nyx", "outfit": "造型 {number}", "locked": "尚未持有" },
+  "equipment": { "title": "配置", "tileBack": "牌背", "table": "桌面", "style": "樣式 {number}", "locked": "尚未持有" },
+  "theme": {
+    "daily": "日常", "streaming": "實況", "outing": "外出", "vacation": "渡假", "swimsuit": "泳裝",
+    "uniform": "制服", "magic_academy": "魔法學院", "classic_maid": "古典女僕", "modern_maid": "現代女僕",
+    "waiter": "服務生", "dancer": "舞者", "cheerleader": "啦啦隊", "singer": "歌手", "idol": "偶像",
+    "magical_girl": "魔法少女", "nursing": "護理", "adventurer": "冒險者", "racing": "賽車", "historical": "古裝"
+  },
+  "gacha": {
+    "title": "轉蛋機", "remaining": "尚未獲得：{count}", "collectionProgress": "收集度 {owned}/{total}", "rate": "機率", "one": "1 抽", "ten": "10 抽",
+    "costOne": "🪙 500", "costTen": "🪙 4,500", "freeTen": "每日免費十抽", "freeUsed": "今日免費十抽已使用",
+    "insufficient": "🪙不足。", "result": "抽獎結果", "new": "NEW", "duplicate": "重複 · 退回 250 🪙",
+    "revealAll": "全部揭示", "probabilityTitle": "機率", "probabilityCharacter": "角色造型：10%",
+    "probabilityTileBack": "牌背：20%", "probabilityTable": "桌面：20%", "probabilityCoins77": "🪙 77：30%",
+    "probabilityCoins777": "🪙 777：15%", "probabilityCoins7777": "🪙 7,777：5%",
+    "guarantee": "十抽保證至少一個牌背或桌面；同分類內的物品機率平均。",
+    "milestone": "累計 {draws} 抽 · 距離配件自選 {accessory} 抽 · 距離角色自選 {character} 抽",
+    "accessoryChoices": "可選牌背／桌面：{count}", "characterChoices": "可選角色造型：{count}",
+    "accessoryChoiceTitle": "選擇牌背或桌面", "characterChoiceTitle": "選擇角色造型",
+    "choiceHint": "請選擇一個尚未持有的獎勵；仍有未持有內容時，已持有項目不可選擇。",
+    "choiceAllOwned": "此分類已全部持有；選擇任一項會退回 250 🪙。",
+    "choiceOwned": "已持有", "choiceDuplicateRefund": "選擇 · 退回 250 🪙", "choiceClaimed": "獎勵已領取。",
+    "choiceClaimedDuplicate": "已選擇重複內容並退回 250 🪙。", "choiceUnavailable": "此自選次數已無法使用。"
+  },
+  "transfer": {
+    "title": "引繼", "export": "引繼文字", "import": "貼上引繼文字", "placeholder": "在此貼上文字",
+    "invalid": "引繼文字無效或已損壞。", "confirmTitle": "確定覆蓋目前進度？",
+    "confirmBody": "金幣、持有內容與設定都會被取代，此操作無法復原。", "success": "進度已成功匯入。"
+  },
+  "daily": { "reward": "每日獎勵", "claimed": "已獲得 30,000 金幣。", "reset": "每日 04:00（UTC+8）重置" },
+  "matchTools": {
+    "label": "牌局功能",
+    "emote": { "title": "表情", "send": "發送 {emote}" },
+    "auto": { "enable": "開啟自動操作", "disable": "關閉自動操作", "status": "自動操作中，由電腦接手此座位。" },
+    "help": {
+      "title": "規則與計算", "rulesTitle": "台灣十六張規則", "taiTitle": "台數列表", "scoringTitle": "資金計算",
+      "ruleGoal": "完成五組面子與一對將。一般手牌為十六張，摸牌後為十七張。",
+      "ruleTurn": "每回合摸一張、打一張；三十秒內未操作時，由電腦代為完成。",
+      "ruleFlowers": "摸到花牌時立即亮出並從牌牆補摸一張，不會在起手時預先補花。",
+      "ruleCalls": "吃只能承接上家的牌；符合條件時可碰、槓或胡其他玩家的棄牌。",
+      "ruleReady": "宣告聽牌後牌型鎖定；之後摸到非胡牌張時會自動打出。",
+      "scoringFormula": "每家應付金額＝基本 500 點＋合計台數 × 250 點。",
+      "scoringDiscard": "放槍：放槍者支付應付金額的三倍。",
+      "scoringSelfDraw": "自摸：其餘三家各自支付一次應付金額。",
+      "scoringCoins": "結算後每 {points} 點局內資金換算 1 枚金幣；局內資金不會低於零。"
+    }
+  },
+  "single": {
+    "title": "單機模式", "wall": "剩餘牌數：{count}", "yourTurn": "請選擇一張牌打出。", "computerThinking": "電腦思考中……",
+    "exit": "離開牌局", "restart": "開始新的一手", "win": "胡牌", "draw": "流局", "winner": "{name} 胡牌",
+    "you": "玩家", "computer": "電腦 {number}", "flowers": "花牌", "discards": "牌河", "rulesNote": "台灣十六張 · 五組面子加一對將",
+    "rotateTitle": "請將裝置轉為橫向", "rotateHint": "麻將牌桌僅支援橫向遊玩。",
+    "claimPrompt": "有人打出 {tile}，請選擇叫牌或略過。", "turnTime": "剩餘操作時間：{seconds} 秒", "selfDraw": "自摸", "ron": "榮和",
+    "selfDrawCall": "自摸！", "ronCall": "胡牌！", "declareReady": "宣告聽牌", "readyMarker": "聽",
+    "chooseReadyDiscard": "請打出發光的牌，完成聽牌宣告。", "readyAutoDiscard": "已聽牌；摸牌後將自動維持牌型。", "tapToContinue": "點擊繼續",
+    "exhaustiveDraw": "牌牆耗盡，無人胡牌", "taiTotal": "合計台數", "taiUnit": "台", "fundSettlement": "局內資金結算", "bankrupt": "歸零",
+    "bankruptcyEnd": "{name} 的資金歸零，本場提前結束。", "confirmSettlement": "確認結算", "coinProfit": "本局獲得金幣", "coinLoss": "本局損失金幣", "coinEven": "本局金幣持平",
+    "coinConversion": "每 {points} 點局內資金換算 1 枚金幣", "lowBalancePenalty": "低於最低入場資金時，勝局金幣獎勵減半。",
+    "tai": { "base": "基本胡", "selfDraw": "自摸", "closed": "門清", "closedSelfDrawBonus": "門清一摸三", "ready": "聽牌", "flowers": "花牌", "allTriplets": "碰碰胡", "allHonors": "字一色", "halfFlush": "混一色", "fullFlush": "清一色", "bigThreeDragons": "大三元", "smallThreeDragons": "小三元", "redDragon": "紅中刻", "greenDragon": "青發刻", "whiteDragon": "白板刻", "seatWind": "門風刻", "roundWind": "圈風刻" },
+    "winLines": {
+      "aya": { "1": "星光已經替我照亮勝利了。", "2": "這副牌的命運，早就在我的掌心。", "3": "漂亮收尾，這才配得上 AstraNova。", "4": "別眨眼，勝負就在這一瞬間。", "5": "承讓了；下一局也請全力以赴。" },
+      "mio": { "1": "太好了！這次的幸運被我接住啦！", "2": "鏘鏘——Lumi 的閃亮胡牌！", "3": "嘿嘿，開心的牌果然會自己湊過來。", "4": "完成！大家有看到剛才那一手嗎？", "5": "今天的光芒也完全沒有輸喔！" },
+      "sora": { "1": "結束了；你們的牌路，我都看清了。", "2": "夜色落下時，勝負便已決定。", "3": "無須僥倖，這只是計算的結果。", "4": "安靜一點，讓勝利自己說話。", "5": "將軍。下一局，記得藏好你的破綻。" }
+    },
+    "claim": { "chi": "吃", "pong": "碰", "kong": "槓", "win": "胡", "pass": "略過" }
+  }
+}

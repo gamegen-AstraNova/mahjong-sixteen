@@ -1,0 +1,79 @@
+.match-action-callout {
+  --action-left: 50%;
+  --action-top: 50%;
+  position: absolute;
+  z-index: 32;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.match-action-seat-0 {
+  --action-left: var(--match-action-0-x, 50%);
+  --action-top: var(--match-action-0-y, 55%);
+}
+
+.match-action-seat-1 {
+  --action-left: var(--match-action-1-x, 40%);
+  --action-top: var(--match-action-1-y, 36%);
+}
+
+.match-action-seat-2 {
+  --action-left: var(--match-action-2-x, 50%);
+  --action-top: var(--match-action-2-y, 22%);
+}
+
+.match-action-seat-3 {
+  --action-left: var(--match-action-3-x, 60%);
+  --action-top: var(--match-action-3-y, 39%);
+}
+
+.match-action-impact {
+  position: absolute;
+  left: var(--action-left);
+  top: var(--action-top);
+  width: clamp(5.8rem, 9.5vw, 8.8rem);
+  aspect-ratio: 1;
+  animation: match-action-impact 1s cubic-bezier(.16, .82, .25, 1) both;
+}
+
+.match-action-impact img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.match-action-kind-win .match-action-impact,
+.match-action-kind-selfDraw .match-action-impact {
+  width: clamp(8rem, 13vw, 12rem);
+  animation-duration: 2.5s;
+}
+
+.match-action-kind-selfDraw .match-action-impact {
+  width: clamp(12rem, 21vw, 19rem);
+  aspect-ratio: 3 / 2;
+}
+
+@keyframes match-action-impact {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.18);
+  }
+  16% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.14);
+  }
+  32%, 78% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.16);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match-action-impact { animation-timing-function: linear; }
+}

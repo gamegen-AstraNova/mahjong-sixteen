@@ -1,0 +1,135 @@
+{
+  "app": { "title": "麻將十六張", "subtitle": "AstraNova" },
+  "home": {
+    "offline": "Solo",
+    "online": "Online",
+    "onlineComing": "Online mode is ready for server integration and will open later.",
+    "coins": "Coins",
+    "hideUi": "Hide interface",
+    "showUi": "Show interface",
+    "rerollLine": "Tap the Chara to hear another line",
+    "line": {
+      "aya": {
+        "1": "The tea is ready. Sit down and play a few rounds with me?",
+        "2": "The table feels peaceful today—perfect for thinking things through.",
+        "3": "Don't rush your discard. I want to see how you build your hand.",
+        "4": "If you're tired, have some tea first. The table isn't going anywhere.",
+        "5": "A good hand takes patience, just like tea needs time to steep.",
+        "6": "I won't go easy on you just because it's you.",
+        "7": "Your face gives away your whole hand... I'm only teasing.",
+        "8": "Want to guess which tile I'm hoping to draw?",
+        "9": "Winning doesn't matter? Say that again after you beat me.",
+        "10": "One more round. I haven't seen enough of your style yet."
+      },
+      "mio": {
+        "1": "...You're here? Sit. A quiet game sounds good.",
+        "2": "You don't need to talk. The tiles tell me what you're thinking.",
+        "3": "Don't discard that one... Never mind. Forget I said anything.",
+        "4": "You're hesitating too long. The table won't wait.",
+        "5": "My luck is average today. Good. I'll win with judgment.",
+        "6": "Don't stare at me. Watch your own tiles.",
+        "7": "Focus if you want to win. I won't remind you twice.",
+        "8": "...This round is getting interesting. Continue.",
+        "9": "Decide what to discard before you draw. It's faster.",
+        "10": "Another line? You're surprisingly patient."
+      },
+      "sora": {
+        "1": "Oh, you're here. Ready to make this a lively match?",
+        "2": "Just so we're clear, don't blame my amazing luck when you lose.",
+        "3": "This tile is telling me to keep it—probably.",
+        "4": "Were you just trying to read my expression?",
+        "5": "Come on, hurry up! Good tiles hate waiting.",
+        "6": "If I win by self-draw, you're buying me something nice to drink.",
+        "7": "Relax. I only happen to be smiling suspiciously.",
+        "8": "Let's make this round exciting. Dare to follow my lead?",
+        "9": "Nothing at this table is luck—only my brilliant predictions.",
+        "10": "Click again? Sure. Let's see what else I have to say."
+      }
+    }
+  },
+  "online": {
+    "defaultName": "Player", "serverMissing": "The shared server source is connected, but a deployed server URL has not been configured yet.",
+    "connectionError": "Unable to reach the multiplayer server.", "joinError": "Unable to create or join this room.",
+    "nickname": "Nickname", "create": "Create room", "refresh": "Refresh", "roomList": "Open rooms", "loading": "Loading rooms…",
+    "noRooms": "No open rooms. Create the first one.", "unnamedHost": "Host", "room": "Room", "emptySlot": "Open seat",
+    "host": "Host", "computer": "Computer", "player": "Player", "waitingPlayer": "Waiting for player", "start": "Start",
+    "startHint": "You can start now; empty seats will be filled by computers.", "waitHost": "Waiting for the host to start.",
+    "matchCreated": "The server created the match successfully.", "ruleEnginePending": "The authoritative Mahjong rule engine is the next integration step; unverified client moves are currently rejected.",
+    "phase": { "waiting": "Waiting", "playing": "Playing", "over": "Finished" }
+  },
+  "action": {
+    "language": "Language", "sfx": "SE", "bgm": "BGM", "characters": "Chara",
+    "equipment": "Style", "gacha": "Gacha", "transfer": "Transfer", "close": "Close",
+    "ownedOnly": "Owned", "select": "Select", "selected": "Selected", "cancel": "Cancel",
+    "confirm": "Confirm", "copy": "Copy", "copied": "Copied", "back": "Back"
+  },
+  "language": { "title": "Language", "en": "English", "zh-TW": "Traditional Chinese", "zh-CN": "Simplified Chinese", "ja": "Japanese" },
+  "character": { "title": "Chara", "aya": "Asteria", "mio": "Lumi", "sora": "Nyx", "outfit": "Outfit {number}", "locked": "Not owned" },
+  "equipment": { "title": "Style", "tileBack": "Tile Backs", "table": "Tables", "style": "Style {number}", "locked": "Not owned" },
+  "theme": {
+    "daily": "Daily", "streaming": "Streaming", "outing": "Outing", "vacation": "Vacation", "swimsuit": "Swimsuit",
+    "uniform": "Uniform", "magic_academy": "Magic Academy", "classic_maid": "Classic Maid", "modern_maid": "Modern Maid",
+    "waiter": "Server", "dancer": "Dancer", "cheerleader": "Cheerleader", "singer": "Singer", "idol": "Idol",
+    "magical_girl": "Magical Girl", "nursing": "Nursing", "adventurer": "Adventurer", "racing": "Racing", "historical": "Historical"
+  },
+  "gacha": {
+    "title": "Gacha", "remaining": "Uncollected rewards: {count}", "collectionProgress": "Collection {owned}/{total}", "rate": "Rates", "one": "Draw 1",
+    "ten": "Draw 10", "costOne": "🪙 500", "costTen": "🪙 4,500", "freeTen": "Daily free draw",
+    "freeUsed": "Free draw used", "insufficient": "Not enough 🪙.", "result": "Draw Results", "new": "NEW",
+    "duplicate": "Duplicate · +250 🪙", "revealAll": "Reveal all", "probabilityTitle": "Rates",
+    "probabilityCharacter": "Chara outfit: 10%", "probabilityTileBack": "Tile back: 20%",
+    "probabilityTable": "Table: 20%", "probabilityCoins77": "🪙 77: 30%",
+    "probabilityCoins777": "🪙 777: 15%", "probabilityCoins7777": "🪙 7,777: 5%",
+    "guarantee": "A 10-draw guarantees at least one tile back or table. Items within a category have equal rates.",
+    "milestone": "Total draws: {draws} · Accessory choice in {accessory} · Chara choice in {character}",
+    "accessoryChoices": "Accessory choices available: {count}", "characterChoices": "Chara choices available: {count}",
+    "accessoryChoiceTitle": "Choose a Tile Back or Table", "characterChoiceTitle": "Choose a Chara Outfit",
+    "choiceHint": "Select one unowned reward. Owned items remain unavailable while unowned rewards exist.",
+    "choiceAllOwned": "You own everything in this category. Selecting any item refunds 250 🪙.",
+    "choiceOwned": "Owned", "choiceDuplicateRefund": "Choose · +250 🪙", "choiceClaimed": "Reward claimed.",
+    "choiceClaimedDuplicate": "Duplicate selected · 250 🪙 refunded.", "choiceUnavailable": "This choice is no longer available."
+  },
+  "transfer": {
+    "title": "Transfer Data", "export": "Transfer code", "import": "Paste transfer code", "placeholder": "Paste code here",
+    "invalid": "This transfer code is invalid or damaged.", "confirmTitle": "Overwrite current progress?",
+    "confirmBody": "Coins, owned items and settings will be replaced. This cannot be undone.", "success": "Progress imported successfully."
+  },
+  "daily": { "reward": "Daily reward", "claimed": "30,000 coins received.", "reset": "Resets daily at 04:00 (UTC+8)" },
+  "matchTools": {
+    "label": "Match tools",
+    "emote": { "title": "Emotes", "send": "Send {emote}" },
+    "auto": { "enable": "Enable auto play", "disable": "Disable auto play", "status": "Auto play is controlling this seat." },
+    "help": {
+      "title": "Rules & Scoring", "rulesTitle": "Taiwan 16-tile rules", "taiTitle": "Tai list", "scoringTitle": "Fund calculation",
+      "ruleGoal": "Complete five melds and one pair. A concealed hand normally has 16 tiles and 17 after drawing.",
+      "ruleTurn": "Draw one tile and discard one tile. If no action is taken within 30 seconds, the computer acts for that player.",
+      "ruleFlowers": "A flower is exposed as soon as it is drawn, then a replacement tile is drawn from the wall.",
+      "ruleCalls": "Chow may only claim the previous player's discard; Pong, Kong and a winning discard may be claimed when available.",
+      "ruleReady": "Declaring ready locks the hand. Future non-winning draws are discarded automatically.",
+      "scoringFormula": "Payment per opponent = 500 base points + total tai × 250 points.",
+      "scoringDiscard": "Win by discard: the discarder pays three times the payment.",
+      "scoringSelfDraw": "Self-draw: each of the other three players pays the payment.",
+      "scoringCoins": "After settlement, every {points} table points converts to 1 coin. Funds never fall below zero."
+    }
+  },
+  "single": {
+    "title": "Single Player", "wall": "Tiles remaining: {count}", "yourTurn": "Choose a tile to discard.",
+    "computerThinking": "Computer is thinking…", "exit": "Leave match", "restart": "New hand", "win": "Win",
+    "draw": "Exhaustive draw", "winner": "{name} wins", "you": "You", "computer": "Computer {number}",
+    "flowers": "Flowers", "discards": "Discards", "rulesNote": "Taiwan 16-tile rules · five melds and one pair",
+    "rotateTitle": "Rotate to landscape", "rotateHint": "The Mahjong table is designed for landscape play.",
+    "claimPrompt": "{tile} was discarded. Call or pass.", "turnTime": "{seconds} seconds remaining", "selfDraw": "Self-draw", "ron": "Win by discard",
+    "selfDrawCall": "Self-draw!", "ronCall": "Mahjong!", "declareReady": "Declare ready", "readyMarker": "READY",
+    "chooseReadyDiscard": "Discard a glowing tile to complete the ready declaration.", "readyAutoDiscard": "Ready declared; drawn tiles keep the hand locked.", "tapToContinue": "Tap to continue",
+    "exhaustiveDraw": "The wall is exhausted with no winner", "taiTotal": "Total tai", "taiUnit": "tai", "fundSettlement": "Table funds settlement", "bankrupt": "Broke",
+    "bankruptcyEnd": "{name} has reached zero funds. The match ends early.", "confirmSettlement": "Confirm settlement", "coinProfit": "Coins earned this hand", "coinLoss": "Coins lost this hand", "coinEven": "No coin change",
+    "coinConversion": "Every {points} table points converts to 1 coin", "lowBalancePenalty": "Wins pay half coins when entering below the minimum balance.",
+    "tai": { "base": "Basic win", "selfDraw": "Self-draw", "closed": "Closed hand", "closedSelfDrawBonus": "Closed self-draw bonus", "ready": "Ready declaration", "flowers": "Flowers", "allTriplets": "All triplets", "allHonors": "All honors", "halfFlush": "Half flush", "fullFlush": "Full flush", "bigThreeDragons": "Big three dragons", "smallThreeDragons": "Small three dragons", "redDragon": "Red dragon set", "greenDragon": "Green dragon set", "whiteDragon": "White dragon set", "seatWind": "Seat wind set", "roundWind": "Round wind set" },
+    "winLines": {
+      "aya": { "1": "The stars have already lit my path to victory.", "2": "This hand's fate was in my palm all along.", "3": "A flawless finish, worthy of AstraNova.", "4": "Don't blink. Victory lives in this instant.", "5": "Well played. Give me everything next round, too." },
+      "mio": { "1": "Yes! I caught every last bit of that luck!", "2": "Ta-da—Lumi's sparkling winning hand!", "3": "Happy tiles really do gather on their own!", "4": "Done! Everyone saw that move, right?", "5": "I'm shining brighter than ever today!" },
+      "sora": { "1": "It's over. I saw every path your tiles could take.", "2": "When night falls, the outcome is already sealed.", "3": "No luck required. This is simply the result.", "4": "Quiet. Let victory speak for itself.", "5": "Checkmate. Hide your openings better next time." }
+    },
+    "claim": { "chi": "Chow", "pong": "Pong", "kong": "Kong", "win": "Win", "pass": "Pass" }
+  }
+}

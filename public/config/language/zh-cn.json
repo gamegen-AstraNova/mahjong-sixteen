@@ -1,0 +1,128 @@
+{
+  "app": { "title": "麻將十六張", "subtitle": "AstraNova" },
+  "home": {
+    "offline": "单机", "online": "联机", "onlineComing": "联机模式已预留服务器接口，将于后续开放。",
+    "coins": "持有金币", "hideUi": "隐藏界面", "showUi": "显示界面",
+    "rerollLine": "点击角色重新抽选台词",
+    "line": {
+      "aya": {
+        "1": "茶已经泡好了。坐下来，陪我打几圈吧？",
+        "2": "今天的牌风很安静，正适合慢慢思考。",
+        "3": "别急着出牌，我想看看你会怎么布局。",
+        "4": "如果累了就先喝口茶，牌桌不会跑掉的。",
+        "5": "好牌需要耐心，就像等一壶茶慢慢回甘。",
+        "6": "这一局，我可不会因为是你就手下留情。",
+        "7": "你的表情把手牌都写出来了……开玩笑的。",
+        "8": "要不要猜猜，我现在最想摸到哪一张牌？",
+        "9": "输赢不重要？嗯，等你赢了再说这句吧。",
+        "10": "再来一局吧。我还没看够你的打法。"
+      },
+      "mio": {
+        "1": "……来了？坐。安静打牌也不错。",
+        "2": "不用说话。牌会告诉我你在想什么。",
+        "3": "这张不要打……算了，当我没说。",
+        "4": "你犹豫太久了。牌桌可不等人。",
+        "5": "今天手气普通。正好靠判断取胜。",
+        "6": "别盯着我看。看你自己的牌。",
+        "7": "想赢就专心，我不会提醒第二次。",
+        "8": "……这局有点意思。继续。",
+        "9": "摸牌前先想好要丢什么，会快很多。",
+        "10": "再抽一句？你还真有耐心。"
+      },
+      "sora": {
+        "1": "哦，你来啦。今天要打得痛快一点？",
+        "2": "先说好，输了可别怪我手气太好。",
+        "3": "这张牌在叫我留下它——大概吧。",
+        "4": "你刚才是不是偷看我的表情了？",
+        "5": "快一点快一点，好牌可不喜欢等人。",
+        "6": "要是我自摸，你就请我喝点好喝的。",
+        "7": "别紧张，我只是刚好笑得很可疑而已。",
+        "8": "这局来点刺激的，敢不敢跟？",
+        "9": "牌桌上没有偶然，只有我漂亮的预判。",
+        "10": "再点一次？好啊，看我还会说什么。"
+      }
+    }
+  },
+  "online": {
+    "defaultName": "玩家", "serverMissing": "已连接共用服务器源代码，但尚未设置部署后的服务器网址。",
+    "connectionError": "无法连接多人服务器。", "joinError": "无法创建或加入这个房间。",
+    "nickname": "昵称", "create": "创建房间", "refresh": "刷新", "roomList": "公开房间", "loading": "正在读取房间……",
+    "noRooms": "目前没有公开房间，可以创建第一间。", "unnamedHost": "房主", "room": "房间", "emptySlot": "空位",
+    "host": "房主", "computer": "电脑", "player": "玩家", "waitingPlayer": "等待玩家加入", "start": "开始",
+    "startHint": "现在即可开始，空位会由电脑自动补足。", "waitHost": "等待房主开始。",
+    "matchCreated": "服务器已成功创建牌局。", "ruleEnginePending": "下一阶段会接入服务器权威麻将规则核心；目前会拒绝未经验证的客户端牌局操作。",
+    "phase": { "waiting": "等待中", "playing": "牌局中", "over": "已结束" }
+  },
+  "action": {
+    "language": "语言", "sfx": "音效", "bgm": "BGM", "characters": "角色", "equipment": "配置",
+    "gacha": "扭蛋", "transfer": "继承", "close": "关闭", "ownedOnly": "持有", "select": "选择",
+    "selected": "使用中", "cancel": "取消", "confirm": "确认", "copy": "复制", "copied": "已复制", "back": "返回"
+  },
+  "language": { "title": "语言", "en": "English", "zh-TW": "繁體中文", "zh-CN": "简体中文", "ja": "日本語" },
+  "character": { "title": "角色", "aya": "Asteria", "mio": "Lumi", "sora": "Nyx", "outfit": "造型 {number}", "locked": "尚未持有" },
+  "equipment": { "title": "配置", "tileBack": "牌背", "table": "桌面", "style": "样式 {number}", "locked": "尚未持有" },
+  "theme": {
+    "daily": "日常", "streaming": "直播", "outing": "外出", "vacation": "度假", "swimsuit": "泳装",
+    "uniform": "制服", "magic_academy": "魔法学院", "classic_maid": "古典女仆", "modern_maid": "现代女仆",
+    "waiter": "服务生", "dancer": "舞者", "cheerleader": "啦啦队", "singer": "歌手", "idol": "偶像",
+    "magical_girl": "魔法少女", "nursing": "护理", "adventurer": "冒险者", "racing": "赛车", "historical": "古装"
+  },
+  "gacha": {
+    "title": "扭蛋机", "remaining": "尚未获得：{count}", "collectionProgress": "收集度 {owned}/{total}", "rate": "概率", "one": "1 抽", "ten": "10 抽",
+    "costOne": "🪙 500", "costTen": "🪙 4,500", "freeTen": "每日免费十抽", "freeUsed": "今日免费十抽已使用",
+    "insufficient": "🪙不足。", "result": "抽奖结果", "new": "NEW", "duplicate": "重复 · 返还 250 🪙",
+    "revealAll": "全部揭示", "probabilityTitle": "概率", "probabilityCharacter": "角色造型：10%",
+    "probabilityTileBack": "牌背：20%", "probabilityTable": "桌面：20%", "probabilityCoins77": "🪙 77：30%",
+    "probabilityCoins777": "🪙 777：15%", "probabilityCoins7777": "🪙 7,777：5%",
+    "guarantee": "十抽保证至少一个牌背或桌面；同分类内的物品概率平均。",
+    "milestone": "累计 {draws} 抽 · 距离配件自选 {accessory} 抽 · 距离角色自选 {character} 抽",
+    "accessoryChoices": "可选牌背／桌面：{count}", "characterChoices": "可选角色造型：{count}",
+    "accessoryChoiceTitle": "选择牌背或桌面", "characterChoiceTitle": "选择角色造型",
+    "choiceHint": "请选择一个尚未持有的奖励；仍有未持有内容时，已持有项目不可选择。",
+    "choiceAllOwned": "此分类已全部持有；选择任一项会返还 250 🪙。",
+    "choiceOwned": "已持有", "choiceDuplicateRefund": "选择 · 返还 250 🪙", "choiceClaimed": "奖励已领取。",
+    "choiceClaimedDuplicate": "已选择重复内容并返还 250 🪙。", "choiceUnavailable": "此次自选已无法使用。"
+  },
+  "transfer": {
+    "title": "继承", "export": "继承文字", "import": "粘贴继承文字", "placeholder": "在此粘贴文字",
+    "invalid": "继承文字无效或已损坏。", "confirmTitle": "确定覆盖当前进度？",
+    "confirmBody": "金币、持有内容与设置都会被替换，此操作无法撤销。", "success": "进度已成功导入。"
+  },
+  "daily": { "reward": "每日奖励", "claimed": "已获得 30,000 金币。", "reset": "每日 04:00（UTC+8）重置" },
+  "matchTools": {
+    "label": "牌局功能",
+    "emote": { "title": "表情", "send": "发送 {emote}" },
+    "auto": { "enable": "开启自动操作", "disable": "关闭自动操作", "status": "自动操作中，由电脑接管此座位。" },
+    "help": {
+      "title": "规则与计算", "rulesTitle": "台湾十六张规则", "taiTitle": "台数列表", "scoringTitle": "资金计算",
+      "ruleGoal": "完成五组面子与一对将。一般手牌为十六张，摸牌后为十七张。",
+      "ruleTurn": "每回合摸一张、打一张；三十秒内未操作时，由电脑代为完成。",
+      "ruleFlowers": "摸到花牌时立即亮出并从牌墙补摸一张，不会在起手时预先补花。",
+      "ruleCalls": "吃只能承接上家的牌；符合条件时可碰、杠或胡其他玩家的弃牌。",
+      "ruleReady": "宣告听牌后牌型锁定；之后摸到非胡牌张时会自动打出。",
+      "scoringFormula": "每家应付金额＝基本 500 点＋合计台数 × 250 点。",
+      "scoringDiscard": "放铳：放铳者支付应付金额的三倍。",
+      "scoringSelfDraw": "自摸：其余三家各自支付一次应付金额。",
+      "scoringCoins": "结算后每 {points} 点局内资金换算 1 枚金币；局内资金不会低于零。"
+    }
+  },
+  "single": {
+    "title": "单机模式", "wall": "剩余牌数：{count}", "yourTurn": "请选择一张牌打出。", "computerThinking": "电脑思考中……",
+    "exit": "离开牌局", "restart": "开始新的一手", "win": "胡牌", "draw": "流局", "winner": "{name} 胡牌",
+    "you": "玩家", "computer": "电脑 {number}", "flowers": "花牌", "discards": "牌河", "rulesNote": "台湾十六张 · 五组面子加一对将",
+    "rotateTitle": "请将设备转为横向", "rotateHint": "麻将牌桌仅支持横向游玩。",
+    "claimPrompt": "有人打出 {tile}，请选择叫牌或跳过。", "turnTime": "剩余操作时间：{seconds} 秒", "selfDraw": "自摸", "ron": "荣和",
+    "selfDrawCall": "自摸！", "ronCall": "胡牌！", "declareReady": "宣告听牌", "readyMarker": "听",
+    "chooseReadyDiscard": "请打出发光的牌，完成听牌宣告。", "readyAutoDiscard": "已听牌；摸牌后将自动维持牌型。", "tapToContinue": "点击继续",
+    "exhaustiveDraw": "牌墙耗尽，无人胡牌", "taiTotal": "合计台数", "taiUnit": "台", "fundSettlement": "局内资金结算", "bankrupt": "归零",
+    "bankruptcyEnd": "{name} 的资金归零，本场提前结束。", "confirmSettlement": "确认结算", "coinProfit": "本局获得金币", "coinLoss": "本局损失金币", "coinEven": "本局金币持平",
+    "coinConversion": "每 {points} 点局内资金换算 1 枚金币", "lowBalancePenalty": "低于最低入场资金时，胜局金币奖励减半。",
+    "tai": { "base": "基本胡", "selfDraw": "自摸", "closed": "门清", "closedSelfDrawBonus": "门清一摸三", "ready": "听牌", "flowers": "花牌", "allTriplets": "碰碰胡", "allHonors": "字一色", "halfFlush": "混一色", "fullFlush": "清一色", "bigThreeDragons": "大三元", "smallThreeDragons": "小三元", "redDragon": "红中刻", "greenDragon": "青发刻", "whiteDragon": "白板刻", "seatWind": "门风刻", "roundWind": "圈风刻" },
+    "winLines": {
+      "aya": { "1": "星光已经替我照亮胜利了。", "2": "这副牌的命运，早就在我的掌心。", "3": "漂亮收尾，这才配得上 AstraNova。", "4": "别眨眼，胜负就在这一瞬间。", "5": "承让了；下一局也请全力以赴。" },
+      "mio": { "1": "太好了！这次的幸运被我接住啦！", "2": "锵锵——Lumi 的闪亮胡牌！", "3": "嘿嘿，开心的牌果然会自己凑过来。", "4": "完成！大家有看到刚才那一手吗？", "5": "今天的光芒也完全没有输哦！" },
+      "sora": { "1": "结束了；你们的牌路，我都看清了。", "2": "夜色落下时，胜负便已决定。", "3": "无需侥幸，这只是计算的结果。", "4": "安静一点，让胜利自己说话。", "5": "将军。下一局，记得藏好你的破绽。" }
+    },
+    "claim": { "chi": "吃", "pong": "碰", "kong": "杠", "win": "胡", "pass": "跳过" }
+  }
+}
