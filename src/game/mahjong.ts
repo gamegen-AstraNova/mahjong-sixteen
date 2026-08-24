@@ -12,6 +12,12 @@ export interface TaiResult { total: number; patterns: TaiPattern[]; }
 export interface HandSettlement { reason: 'win' | 'draw'; tai: number; patterns: TaiPattern[]; deltas: number[]; bankruptPlayer: number | null; }
 export interface RoundProgress { dealer: number; handNumber: number; dealerStreak: number; eastSeat?: number; prevailingWind?: WindTile; }
 export interface WaitingTileInfo { tile: TileId; remaining: number; }
+export interface GameplayTuning {
+  favoredPlayer: number | null;
+  drawAssistChance: number;
+  drawCandidateCount: number;
+  aiDiscardMistakeChance: number;
+}
 export type LastTileFocus =
   | { area: 'river'; seat: number; tile: TileId }
   | { area: 'meld'; seat: number; tile: TileId; meldIndex: number; tileIndex: number }
@@ -29,6 +35,8 @@ export const INITIAL_POINTS = 25_000;
 export const BASE_PAYMENT = 500;
 export const PAYMENT_PER_TAI = 200;
 export const TURN_TIME_SECONDS = 15;
+export const STANDARD_GAMEPLAY_TUNING: Readonly<GameplayTuning> = Object.freeze({ favoredPlayer: null, drawAssistChance: 0, drawCandidateCount: 1, aiDiscardMistakeChance: 0 });
+export const SINGLE_PLAYER_TUNING: Readonly<GameplayTuning> = Object.freeze({ favoredPlayer: 0, drawAssistChance: 0.45, drawCandidateCount: 3, aiDiscardMistakeChance: 0.3 });
 
 const SUITED: TileId[] = (['m', 'p', 's'] as const).flatMap((suit) => Array.from({ length: 9 }, (_, index) => `${suit}${index + 1}` as TileId));
 const WINDS: WindTile[] = Array.from({ length: 4 }, (_, index) => `w${index + 1}` as WindTile);
@@ -54,8 +62,42 @@ export function createWall(random: () => number = Math.random): TileId[] {
   STANDARD_TILE_TYPES.forEach((tile) => { for (let copy = 0; copy < 4; copy += 1) wall.push(tile); });
   wall.push(...FLOWERS); return shuffleTiles(wall, random);
 }
-function drawReplacement(wall: TileId[], hand: PlayerHand): TileId | null {
-  while (wall.length > 8) { const tile = wall.pop() ?? null; if (!tile) return null; if (isFlower(tile)) { hand.flowers.push(tile); continue; } return tile; }
+function readyPotential(tiles: TileId[], openMeldCount: number): number {
+  if (tiles.length % 3 !== 2) return 0;
+  const waits = new Set<TileId>();
+  tiles.forEach((_, discardIndex) => {
+    const afterDiscard = tiles.filter((__, index) => index !== discardIndex);
+    STANDARD_TILE_TYPES.forEach((candidate) => {
+      if (countTile(afterDiscard, candidate) < 4 && isWinningHand([...afterDiscard, candidate], openMeldCount)) waits.add(candidate);
+    });
+  });
+  return waits.size;
+}
+
+function assistedDrawIndex(wall: TileId[], hand: PlayerHand, candidateCount: number): number {
+  const candidates: number[] = [];
+  for (let index = wall.length - 1; index >= 8 && candidates.length < candidateCount; index -= 1) {
+    if (!isFlower(wall[index])) candidates.push(index);
+  }
+  const scored = candidates.map((index) => {
+    const tile = wall[index];
+    const prospective = [...hand.concealed, tile];
+    const winning = isWinningHand(prospective, hand.melds.length);
+    return { index, score: Number(winning) * 100_000 + readyPotential(prospective, hand.melds.length) * 1_000 + tileValue(tile, prospective) };
+  });
+  scored.sort((a, b) => b.score - a.score || b.index - a.index);
+  return scored[0]?.index ?? wall.length - 1;
+}
+
+function drawReplacement(wall: TileId[], hand: PlayerHand, assisted: boolean, tuning: Readonly<GameplayTuning>, random: () => number): TileId | null {
+  while (wall.length > 8) {
+    const top = wall.at(-1) ?? null;
+    if (!top) return null;
+    if (isFlower(top)) { hand.flowers.push(wall.pop()!); continue; }
+    const useAssist = assisted && tuning.drawCandidateCount > 1 && random() < tuning.drawAssistChance;
+    const index = useAssist ? assistedDrawIndex(wall, hand, tuning.drawCandidateCount) : wall.length - 1;
+    return wall.splice(index, 1)[0] ?? null;
+  }
   return null;
 }
 
@@ -237,15 +279,16 @@ function finishDraw(state: MahjongState) {
   state.circleComplete = false;
   state.matchComplete = bankrupt >= 0;
 }
-function drawForPlayer(state: MahjongState, player: number) {
-  const hand = state.players[player]; const drawn = drawReplacement(state.wall, hand); if (!drawn) { finishDraw(state); return; }
+function drawForPlayer(state: MahjongState, player: number, tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING, random: () => number = Math.random) {
+  const hand = state.players[player]; const assisted = tuning.favoredPlayer === player;
+  const drawn = drawReplacement(state.wall, hand, assisted, tuning, random); if (!drawn) { finishDraw(state); return; }
   hand.concealed.push(drawn); state.lastDrawn = drawn;
   if (isWinningHand(hand.concealed, hand.melds.length)) applyWinSettlement(state, player, 'selfDraw', null);
 }
-function advanceAfterDiscard(state: MahjongState) {
-  const discarder = state.pendingDiscard?.player ?? state.currentPlayer; state.pendingDiscard = null; state.claimOptions = []; state.phase = 'discard'; state.currentPlayer = nextPlayer(discarder); drawForPlayer(state, state.currentPlayer);
+function advanceAfterDiscard(state: MahjongState, tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING, random: () => number = Math.random) {
+  const discarder = state.pendingDiscard?.player ?? state.currentPlayer; state.pendingDiscard = null; state.claimOptions = []; state.phase = 'discard'; state.currentPlayer = nextPlayer(discarder); drawForPlayer(state, state.currentPlayer, tuning, random);
 }
-function applyMeldClaim(state: MahjongState, player: number, option: ClaimOption) {
+function applyMeldClaim(state: MahjongState, player: number, option: ClaimOption, tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING, random: () => number = Math.random) {
   const pending = state.pendingDiscard; if (!pending) return; const hand = state.players[player]; removeTiles(hand.concealed, option.consume);
   const pile = state.players[pending.player].discards; if (pile.at(-1) === pending.tile) pile.pop();
   const meldIndex = hand.melds.length;
@@ -255,20 +298,20 @@ function applyMeldClaim(state: MahjongState, player: number, option: ClaimOption
   const tileIndex = Math.max(0, meldTiles.indexOf(pending.tile));
   hand.melds.push({ kind: option.kind as MeldKind, tiles: meldTiles, fromPlayer: pending.player, concealed: false }); hand.concealed = sortTiles(hand.concealed);
   state.lastTileFocus = { area: 'meld', seat: player, tile: pending.tile, meldIndex, tileIndex };
-  state.currentPlayer = player; state.pendingDiscard = null; state.claimOptions = []; state.phase = 'discard'; state.lastDrawn = null; if (option.kind === 'kong') drawForPlayer(state, player);
+  state.currentPlayer = player; state.pendingDiscard = null; state.claimOptions = []; state.phase = 'discard'; state.lastDrawn = null; if (option.kind === 'kong') drawForPlayer(state, player, tuning, random);
 }
 function nextPlayer(player: number): number { return (player + 3) % 4; }
 function counterclockwisePlayers(discarder: number): number[] { return [1, 2, 3].map((offset) => (discarder - offset + 4) % 4); }
-function resolvePendingClaims(state: MahjongState, skipped: Set<number> = new Set()) {
+function resolvePendingClaims(state: MahjongState, skipped: Set<number> = new Set(), tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING, random: () => number = Math.random) {
   const pending = state.pendingDiscard; if (!pending) return;
   const ordered = counterclockwisePlayers(pending.player).filter((player) => !skipped.has(player)); const byPlayer = new Map(ordered.map((player) => [player, getClaimOptions(state, player)]));
   const winner = ordered.find((player) => byPlayer.get(player)?.some((option) => option.kind === 'win'));
   if (winner !== undefined) { if (winner === 0) { state.currentPlayer = 0; state.phase = 'claim'; state.claimOptions = byPlayer.get(0)!.filter((option) => option.kind === 'win'); } else finishDiscardWin(state, winner); return; }
   const setPlayer = ordered.find((player) => byPlayer.get(player)?.some((option) => option.kind === 'kong' || option.kind === 'pong'));
-  if (setPlayer !== undefined) { const options = byPlayer.get(setPlayer)!.filter((option) => option.kind === 'kong' || option.kind === 'pong'); if (setPlayer === 0) { state.currentPlayer = 0; state.phase = 'claim'; state.claimOptions = options; } else applyMeldClaim(state, setPlayer, options.find((option) => option.kind === 'kong') ?? options[0]); return; }
+  if (setPlayer !== undefined) { const options = byPlayer.get(setPlayer)!.filter((option) => option.kind === 'kong' || option.kind === 'pong'); if (setPlayer === 0) { state.currentPlayer = 0; state.phase = 'claim'; state.claimOptions = options; } else applyMeldClaim(state, setPlayer, options.find((option) => option.kind === 'kong') ?? options[0], tuning, random); return; }
   const next = nextPlayer(pending.player);
-  if (!skipped.has(next)) { const options = (byPlayer.get(next) ?? []).filter((option) => option.kind === 'chi'); if (options.length) { if (next === 0) { state.currentPlayer = 0; state.phase = 'claim'; state.claimOptions = options; } else applyMeldClaim(state, next, options[0]); return; } }
-  advanceAfterDiscard(state);
+  if (!skipped.has(next)) { const options = (byPlayer.get(next) ?? []).filter((option) => option.kind === 'chi'); if (options.length) { if (next === 0) { state.currentPlayer = 0; state.phase = 'claim'; state.claimOptions = options; } else applyMeldClaim(state, next, options[0], tuning, random); return; } }
+  advanceAfterDiscard(state, tuning, random);
 }
 
 function tileValue(tile: TileId, hand: TileId[]): number {
@@ -276,8 +319,12 @@ function tileValue(tile: TileId, hand: TileId[]): number {
   if (/^[mps]/u.test(tile)) { const suit = tile[0]; const rank = Number(tile[1]); for (const distance of [-2, -1, 1, 2]) { const neighbor = `${suit}${rank + distance}` as TileId; if (rank + distance >= 1 && rank + distance <= 9 && hand.includes(neighbor)) value += Math.abs(distance) === 1 ? 2 : 1; } }
   return value;
 }
-export function chooseAiDiscard(hand: TileId[], random: () => number = Math.random): number {
-  const scored = hand.map((tile, index) => ({ index, value: tileValue(tile, hand), tie: random() })); scored.sort((a, b) => a.value - b.value || a.tie - b.tie); return scored[0]?.index ?? 0;
+export function chooseAiDiscard(hand: TileId[], random: () => number = Math.random, mistakeChance = 0): number {
+  const makeMistake = mistakeChance > 0 && random() < mistakeChance;
+  const scored = hand.map((tile, index) => ({ index, value: tileValue(tile, hand), tie: random() })); scored.sort((a, b) => a.value - b.value || a.tie - b.tie);
+  if (!makeMistake || scored.length < 2) return scored[0]?.index ?? 0;
+  const alternativeCount = Math.max(1, Math.ceil(scored.length / 2) - 1);
+  return scored[1 + Math.floor(random() * alternativeCount)]?.index ?? scored[0]?.index ?? 0;
 }
 export function readyDiscardIndices(state: MahjongState, player: number): number[] {
   if (state.phase !== 'discard' || state.currentPlayer !== player || state.winner !== null || state.exhausted || state.readyDeclared[player]) return [];
@@ -326,34 +373,35 @@ export function claimDiscardForPlayer(source: MahjongState, player: number, opti
   const option = getClaimOptions(source, player)[optionIndex]; if (!option) return source;
   const state = structuredClone(source); if (option.kind === 'win') finishDiscardWin(state, player); else applyMeldClaim(state, player, option); return state;
 }
-export function advanceAfterAllPasses(source: MahjongState): MahjongState {
+export function advanceAfterAllPasses(source: MahjongState, tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING, random: () => number = Math.random): MahjongState {
   if (!source.pendingDiscard) return source;
-  const state = structuredClone(source); advanceAfterDiscard(state); return state;
+  const state = structuredClone(source); advanceAfterDiscard(state, tuning, random); return state;
 }
-function discardTileInternal(source: MahjongState, tileIndex: number, declaringReady: boolean): MahjongState {
+function discardTileInternal(source: MahjongState, tileIndex: number, declaringReady: boolean, tuning: Readonly<GameplayTuning>, random: () => number): MahjongState {
   const state = discardTileAwaitingInternal(source, source.currentPlayer, tileIndex, declaringReady);
   if (state === source) return source;
-  resolvePendingClaims(state); return state;
+  resolvePendingClaims(state, new Set(), tuning, random); return state;
 }
-export function discardTile(source: MahjongState, tileIndex: number): MahjongState { return discardTileInternal(source, tileIndex, false); }
-export function declareReady(source: MahjongState, tileIndex: number): MahjongState {
-  if (!readyDiscardIndices(source, source.currentPlayer).includes(tileIndex)) return source; const state = structuredClone(source); state.readyDeclared[state.currentPlayer] = true; return discardTileInternal(state, tileIndex, true);
+export function discardTile(source: MahjongState, tileIndex: number, tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING, random: () => number = Math.random): MahjongState { return discardTileInternal(source, tileIndex, false, tuning, random); }
+export function declareReady(source: MahjongState, tileIndex: number, tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING, random: () => number = Math.random): MahjongState {
+  if (!readyDiscardIndices(source, source.currentPlayer).includes(tileIndex)) return source; const state = structuredClone(source); state.readyDeclared[state.currentPlayer] = true; return discardTileInternal(state, tileIndex, true, tuning, random);
 }
-export function claimDiscard(source: MahjongState, optionIndex: number): MahjongState {
+export function claimDiscard(source: MahjongState, optionIndex: number, tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING, random: () => number = Math.random): MahjongState {
   if (source.phase !== 'claim' || source.currentPlayer !== 0 || !source.pendingDiscard) return source; const option = source.claimOptions[optionIndex]; if (!option) return source;
-  const state = structuredClone(source); if (option.kind === 'win') finishDiscardWin(state, 0); else applyMeldClaim(state, 0, option); return state;
+  const state = structuredClone(source); if (option.kind === 'win') finishDiscardWin(state, 0); else applyMeldClaim(state, 0, option, tuning, random); return state;
 }
-export function passClaim(source: MahjongState): MahjongState {
-  if (source.phase !== 'claim' || source.currentPlayer !== 0 || !source.pendingDiscard) return source; const state = structuredClone(source); state.claimOptions = []; resolvePendingClaims(state, new Set([0])); return state;
+export function passClaim(source: MahjongState, tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING, random: () => number = Math.random): MahjongState {
+  if (source.phase !== 'claim' || source.currentPlayer !== 0 || !source.pendingDiscard) return source; const state = structuredClone(source); state.claimOptions = []; resolvePendingClaims(state, new Set([0]), tuning, random); return state;
 }
-export function autoPlayCurrentTurn(source: MahjongState, random: () => number = Math.random): MahjongState {
+export function autoPlayCurrentTurn(source: MahjongState, random: () => number = Math.random, tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING): MahjongState {
   if (source.winner !== null || source.exhausted) return source;
-  if (source.phase === 'claim' && source.currentPlayer === 0) { const win = source.claimOptions.findIndex((option) => option.kind === 'win'); return win >= 0 ? claimDiscard(source, win) : passClaim(source); }
+  if (source.phase === 'claim' && source.currentPlayer === 0) { const win = source.claimOptions.findIndex((option) => option.kind === 'win'); return win >= 0 ? claimDiscard(source, win, tuning, random) : passClaim(source, tuning, random); }
   if (source.phase !== 'discard') return source; const hand = source.players[source.currentPlayer]?.concealed ?? [];
-  if (source.readyDeclared[source.currentPlayer]) return discardTile(source, hand.length - 1);
-  const kongs = kongTiles(source, source.currentPlayer); if (kongs.length) return declareKong(source, kongs[0]);
-  const ready = readyDiscardIndices(source, source.currentPlayer); if (ready.length) return declareReady(source, ready[Math.floor(random() * ready.length)] ?? ready[0]);
-  return discardTile(source, chooseAiDiscard(hand, random));
+  if (source.readyDeclared[source.currentPlayer]) return discardTile(source, hand.length - 1, tuning, random);
+  const kongs = kongTiles(source, source.currentPlayer); if (kongs.length) return declareKong(source, kongs[0], tuning, random);
+  const ready = readyDiscardIndices(source, source.currentPlayer); if (ready.length) return declareReady(source, ready[Math.floor(random() * ready.length)] ?? ready[0], tuning, random);
+  const aiMistakeChance = tuning.favoredPlayer !== null && source.currentPlayer !== tuning.favoredPlayer ? tuning.aiDiscardMistakeChance : 0;
+  return discardTile(source, chooseAiDiscard(hand, random, aiMistakeChance), tuning, random);
 }
 export function kongTiles(state: MahjongState, player: number): TileId[] {
   if (state.phase !== 'discard' || state.currentPlayer !== player || state.wall.length <= 8 || state.readyDeclared[player]) return [];
@@ -364,7 +412,7 @@ export function kongTiles(state: MahjongState, player: number): TileId[] {
     return concealedCopies === 4 || (concealedCopies >= 1 && exposedPong);
   });
 }
-export function declareKong(source: MahjongState, tile: TileId): MahjongState {
+export function declareKong(source: MahjongState, tile: TileId, tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING, random: () => number = Math.random): MahjongState {
   const player = source.currentPlayer; if (!kongTiles(source, player).includes(tile)) return source; const state = structuredClone(source); const hand = state.players[player];
   const exposedPongIndex = hand.melds.findIndex((meld) => !meld.concealed && meld.kind === 'pong' && meld.tiles[0] === tile);
   const exposedPong = hand.melds[exposedPongIndex];
@@ -378,7 +426,7 @@ export function declareKong(source: MahjongState, tile: TileId): MahjongState {
     hand.melds.push({ kind: 'kong', tiles: [tile, tile, tile, tile], fromPlayer: null, concealed: true });
     state.lastTileFocus = { area: 'meld', seat: player, tile, meldIndex: hand.melds.length - 1, tileIndex: 2 };
   }
-  hand.concealed = sortTiles(hand.concealed); drawForPlayer(state, player); return state;
+  hand.concealed = sortTiles(hand.concealed); drawForPlayer(state, player, tuning, random); return state;
 }
 export const discardAndAdvance = discardTile;
 export function tileLabel(tile: TileId): string {

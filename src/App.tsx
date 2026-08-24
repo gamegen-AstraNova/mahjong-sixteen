@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerE
 import { createPortal } from 'react-dom';
 import { ASSETS, tileFaceAsset } from './config/assets';
 import { CHARACTER_IDS, CHARACTER_SKINS, OUTFIT_THEME_SLUGS, TABLES, TILE_BACKS, floorBackgroundForOutfit, lobbyBackgroundForOutfit, uiThemeForOutfit } from './config/catalog';
-import { INITIAL_POINTS, TURN_TIME_SECONDS, autoPlayCurrentTurn, claimDiscard, createInitialState, declareKong, declareReady, discardTile, kongTiles, passClaim, readyDiscardIndices, seatWindForPlayer, startNextHand, tileLabel, waitingTiles, type ClaimOption, type MahjongState, type MeldKind, type TileId } from './game/mahjong';
+import { INITIAL_POINTS, SINGLE_PLAYER_TUNING, TURN_TIME_SECONDS, autoPlayCurrentTurn, claimDiscard, createInitialState, declareKong, declareReady, discardTile, kongTiles, passClaim, readyDiscardIndices, seatWindForPlayer, startNextHand, tileLabel, waitingTiles, type ClaimOption, type MahjongState, type MeldKind, type TileId } from './game/mahjong';
 import { detectMatchActionSignals, matchActionDuration, type MatchActionKind, type MatchActionSignal } from './game/matchActionEvents';
 import { I18nProvider, useI18n } from './i18n/I18nProvider';
 import { MahjongTable3D } from './MahjongTable3D';
@@ -592,7 +592,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit, o
     if (state.settlement || actionLocked) return;
     const interval = window.setInterval(() => setSecondsLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1_000))), 250);
     if (online) return () => window.clearInterval(interval);
-    const timeout = window.setTimeout(() => setSingleState((current) => autoPlayCurrentTurn(current)), TURN_TIME_SECONDS * 1_000);
+    const timeout = window.setTimeout(() => setSingleState((current) => autoPlayCurrentTurn(current, Math.random, SINGLE_PLAYER_TUNING)), TURN_TIME_SECONDS * 1_000);
     return () => { window.clearInterval(interval); window.clearTimeout(timeout); };
   }, [actionLocked, online, online?.view.turnDeadline, turnToken, state.settlement]);
   useEffect(() => {
@@ -606,7 +606,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit, o
       else setSingleState((current) => {
         if (current.settlement) return current;
         const stillAutoPlaying = current.currentPlayer !== 0 || autoPlayEnabled || current.readyDeclared[0];
-        return stillAutoPlaying ? autoPlayCurrentTurn(current) : current;
+        return stillAutoPlaying ? autoPlayCurrentTurn(current, Math.random, SINGLE_PLAYER_TUNING) : current;
       });
     }, MATCH_STEP_DELAY_MS);
     return () => window.clearTimeout(timer);
@@ -733,18 +733,18 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit, o
     if (actionLocked || !playableIndices.includes(index)) return;
     if (readyMode) {
       if (online) online.room.send(MMSG.action, { kind: 'ready', tileIndex: index });
-      else setSingleState((current) => declareReady(current, index));
+      else setSingleState((current) => declareReady(current, index, SINGLE_PLAYER_TUNING));
       setReadyMode(false);
       return;
     }
     if (online) online.room.send(MMSG.action, { kind: 'discard', tileIndex: index });
-    else setSingleState((current) => discardTile(current, index));
+    else setSingleState((current) => discardTile(current, index, SINGLE_PLAYER_TUNING));
   };
   const requestDiscardClaim = (kind: MeldKind) => {
     const choices = discardClaimGroups.get(kind) ?? [];
     if (choices.length === 1) {
       if (online) online.room.send(MMSG.action, { kind: 'claim', optionIndex: choices[0].index });
-      else setSingleState((current) => claimDiscard(current, choices[0].index));
+      else setSingleState((current) => claimDiscard(current, choices[0].index, SINGLE_PLAYER_TUNING));
       return;
     }
     if (choices.length > 1) setClaimChoice({ source: 'discard', kind });
@@ -752,7 +752,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit, o
   const requestKong = () => {
     if (kongs.length === 1) {
       if (online) online.room.send(MMSG.action, { kind: 'kong', tile: kongs[0] });
-      else setSingleState((current) => declareKong(current, kongs[0]));
+      else setSingleState((current) => declareKong(current, kongs[0], SINGLE_PLAYER_TUNING));
       return;
     }
     if (kongs.length > 1) setClaimChoice({ source: 'kong', kind: 'kong' });
@@ -854,18 +854,18 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit, o
             className="claim-option-button"
             key={`${claimChoice.kind}-${index}`}
             aria-label={`${t(`single.claim.${claimChoice.kind}`)} ${option.tiles.map(tileLabel).join(' ')}`}
-            onClick={() => { if (online) online.room.send(MMSG.action, { kind: 'claim', optionIndex: index }); else setSingleState((current) => claimDiscard(current, index)); }}
+            onClick={() => { if (online) online.room.send(MMSG.action, { kind: 'claim', optionIndex: index }); else setSingleState((current) => claimDiscard(current, index, SINGLE_PLAYER_TUNING)); }}
           ><ClaimTileSet runtime={runtime} tiles={option.tiles} /></button>)}
           {claimChoice?.source === 'kong' && kongs.map((tile) => <button
             className="claim-option-button"
             key={tile}
             aria-label={`${t('single.claim.kong')} ${tileLabel(tile)}`}
-            onClick={() => { if (online) online.room.send(MMSG.action, { kind: 'kong', tile }); else setSingleState((current) => declareKong(current, tile)); }}
+            onClick={() => { if (online) online.room.send(MMSG.action, { kind: 'kong', tile }); else setSingleState((current) => declareKong(current, tile, SINGLE_PLAYER_TUNING)); }}
           ><ClaimTileSet runtime={runtime} tiles={[tile, tile, tile, tile]} /></button>)}
           {claimChoice && <button className="call-button call-pass" onClick={() => setClaimChoice(null)}>{t('action.cancel')}</button>}
-          {!claimChoice && state.phase === 'claim' && state.claimOptions.map((option, index) => option.kind === 'win' && <button className="call-button call-win" key={`win-${index}`} onClick={() => { if (online) online.room.send(MMSG.action, { kind: 'claim', optionIndex: index }); else setSingleState((current) => claimDiscard(current, index)); }}>{t('single.claim.win')}</button>)}
+          {!claimChoice && state.phase === 'claim' && state.claimOptions.map((option, index) => option.kind === 'win' && <button className="call-button call-win" key={`win-${index}`} onClick={() => { if (online) online.room.send(MMSG.action, { kind: 'claim', optionIndex: index }); else setSingleState((current) => claimDiscard(current, index, SINGLE_PLAYER_TUNING)); }}>{t('single.claim.win')}</button>)}
           {!claimChoice && state.phase === 'claim' && [...discardClaimGroups.keys()].map((kind) => <button className={`call-button call-${kind}`} key={kind} onClick={() => requestDiscardClaim(kind)}>{t(`single.claim.${kind}`)}</button>)}
-          {!claimChoice && state.phase === 'claim' && <button className="call-button call-pass" onClick={() => { if (online) online.room.send(MMSG.action, { kind: 'pass' }); else setSingleState(passClaim); }}>{t('single.claim.pass')}</button>}
+          {!claimChoice && state.phase === 'claim' && <button className="call-button call-pass" onClick={() => { if (online) online.room.send(MMSG.action, { kind: 'pass' }); else setSingleState((current) => passClaim(current, SINGLE_PLAYER_TUNING)); }}>{t('single.claim.pass')}</button>}
           {!claimChoice && state.phase === 'discard' && kongs.length > 0 && <button className="call-button call-kong" onClick={requestKong}>{t('single.claim.kong')}</button>}
           {!claimChoice && state.phase === 'discard' && readyOptions.length > 0 && <button className={`call-button call-ready ${readyMode ? 'active' : ''}`} onClick={() => setReadyMode((active) => !active)}>{readyMode ? t('action.cancel') : t('single.declareReady')}</button>}
         </div>}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TURN_TIME_SECONDS, advanceAfterAllPasses, autoPlayCurrentTurn, calculateTai, claimDiscard, claimDiscardForPlayer, createInitialState, createWall, declareKong, declareReady, declareReadyAwaitingClaims, discardTile, discardTileAwaitingClaims, getClaimOptions, isFlower, isWinningHand, kongTiles, readyDiscardIndices, seatWindForPlayer, sortTiles, startNextHand, waitingTiles, type MahjongState, type PlayerHand, type TileId } from './mahjong';
+import { SINGLE_PLAYER_TUNING, TURN_TIME_SECONDS, advanceAfterAllPasses, autoPlayCurrentTurn, calculateTai, chooseAiDiscard, claimDiscard, claimDiscardForPlayer, createInitialState, createWall, declareKong, declareReady, declareReadyAwaitingClaims, discardTile, discardTileAwaitingClaims, getClaimOptions, isFlower, isWinningHand, kongTiles, readyDiscardIndices, seatWindForPlayer, sortTiles, startNextHand, waitingTiles, type MahjongState, type PlayerHand, type TileId } from './mahjong';
 
 function hand(concealed: TileId[] = []): PlayerHand {
   return { concealed, flowers: [], discards: [], melds: [] };
@@ -80,6 +80,26 @@ describe('Taiwan mahjong core', () => {
     const next = discardTile(state, 0);
     expect(next.players[3].flowers).toEqual(['f1']);
     expect(next.players[3].concealed).toEqual(['m2']);
+  });
+
+  it('gently favors useful player draws in single-player without changing standard draws', () => {
+    const source = claimState([], 'p9', 1);
+    source.pendingDiscard = { player: 1, tile: 'p9' };
+    source.players[0] = hand(['m1', 'm2']);
+    source.wall = [...Array.from({ length: 8 }, () => 'p9' as TileId), 'm3', 'w4'];
+
+    const standard = advanceAfterAllPasses(source, undefined, () => 0);
+    expect(standard.players[0].concealed.at(-1)).toBe('w4');
+
+    const friendly = advanceAfterAllPasses(source, { ...SINGLE_PLAYER_TUNING, drawAssistChance: 1, drawCandidateCount: 2 }, () => 0);
+    expect(friendly.players[0].concealed.at(-1)).toBe('m3');
+    expect(friendly.wall).toContain('w4');
+  });
+
+  it('lets single-player opponents occasionally choose a plausible suboptimal discard', () => {
+    const tiles = ['m1', 'm2', 'm3', 'w1'] as TileId[];
+    expect(chooseAiDiscard(tiles, () => 0)).toBe(3);
+    expect(chooseAiDiscard(tiles, () => 0, 1)).not.toBe(3);
   });
 
   it('keeps the drawn tile at the far right, then sorts after discarding', () => {
