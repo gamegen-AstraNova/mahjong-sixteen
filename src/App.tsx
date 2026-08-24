@@ -519,7 +519,7 @@ function ClaimTileSet({ runtime, tiles }: { runtime: PlatformRuntime; tiles: Til
   </span>;
 }
 
-type ResultStage = 'cutin' | 'score' | 'coins' | null;
+type ResultStage = 'settlement' | 'coins' | null;
 type QueuedMatchAction = MatchActionSignal & { id: number };
 type MatchUtilityPanel = 'emote' | 'help' | null;
 type ClaimChoice = { source: 'discard'; kind: MeldKind } | { source: 'kong'; kind: 'kong' } | null;
@@ -536,6 +536,7 @@ type MatchEmoteBurst = {
 
 const MATCH_EMOTES = ['😊', '😄', '😮', '😢', '😤', '🤔', '👏', '✨'] as const;
 const MATCH_STEP_DELAY_MS = 1_500;
+const SETTLEMENT_AUTO_ADVANCE_MS = 10_000;
 const WIND_KEYS = ['east', 'south', 'west', 'north'] as const;
 const TAI_HELP_PATTERNS = [
   ['dealer', '1'], ['dealerStreak', '×2'],
@@ -550,6 +551,23 @@ function matchActionLabel(kind: MatchActionKind, t: ReturnType<typeof useI18n>['
   if (kind === 'selfDraw') return t('single.selfDrawCall');
   if (kind === 'win') return t('single.ronCall');
   return t(`single.claim.${kind}`);
+}
+
+function SettlementCountdown({ active, deadline, onElapsed }: { active: boolean; deadline?: number; onElapsed?(): void }) {
+  const { t } = useI18n();
+  const [seconds, setSeconds] = useState(SETTLEMENT_AUTO_ADVANCE_MS / 1_000);
+  const onElapsedRef = useRef(onElapsed);
+  useEffect(() => { onElapsedRef.current = onElapsed; }, [onElapsed]);
+  useEffect(() => {
+    if (!active) return undefined;
+    const target = deadline && deadline > Date.now() ? deadline : Date.now() + SETTLEMENT_AUTO_ADVANCE_MS;
+    const update = () => setSeconds(Math.max(0, Math.ceil((target - Date.now()) / 1_000)));
+    update();
+    const interval = window.setInterval(update, 200);
+    const timeout = window.setTimeout(() => onElapsedRef.current?.(), Math.max(0, target - Date.now()));
+    return () => { window.clearInterval(interval); window.clearTimeout(timeout); };
+  }, [active, deadline]);
+  return active ? <small className="settlement-countdown">{t('single.autoAdvance', { seconds })}</small> : null;
 }
 
 interface OnlineMatchConfig {
@@ -626,7 +644,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit, o
     else if (activeAction.kind === 'win' || activeAction.kind === 'selfDraw') playMahjongSfx('win');
     else playMahjongSfx('special');
     const timer = window.setTimeout(() => {
-      if (activeAction.kind === 'win' || activeAction.kind === 'selfDraw') setResultStage('cutin');
+      if (activeAction.kind === 'win' || activeAction.kind === 'selfDraw') setResultStage('settlement');
       setActionQueue((queue) => queue[0]?.id === activeAction.id ? queue.slice(1) : queue);
     }, matchActionDuration(activeAction.kind));
     return () => window.clearTimeout(timer);
@@ -644,7 +662,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit, o
     if (!state.settlement) return;
     setReadyMode(false);
     setWinLine(1 + Math.floor(Math.random() * WIN_LINE_COUNT));
-    if (state.winner === null) setResultStage('score');
+    if (state.winner === null) setResultStage('settlement');
   }, [state.settlement]);
   useEffect(() => {
     if (!online || state.settlement) return;
@@ -675,7 +693,13 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit, o
     ? selectedSkin.id
     : onlinePlayers?.[state.winner]?.character ?? (state.winner === 0 ? selectedSkin.id : AI_CHARACTER_SKINS[state.winner]);
   const winnerSkin = CHARACTER_SKINS.find((skin) => skin.id === winnerSkinId) ?? selectedSkin;
-  const participantName = (index: number) => onlinePlayers?.[index]?.name ?? (index === 0 ? t('single.you') : t('single.computer', { number: index }));
+  const participantName = (index: number) => {
+    const onlineName = onlinePlayers?.[index]?.name;
+    if (onlineName) return onlineName;
+    if (index === 0) return t('single.you');
+    const aiSkin = CHARACTER_SKINS.find((skin) => skin.id === AI_CHARACTER_SKINS[index]) ?? CHARACTER_SKINS[index];
+    return characterName(aiSkin.characterId, t);
+  };
   const winnerName = state.winner === null ? '' : participantName(state.winner);
   const winQuote = t(`single.winLines.${winnerSkin.characterId}.${winLine}`);
 
@@ -712,6 +736,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit, o
   };
   const confirmHandSettlement = () => {
     if (online) {
+      if (onlineLocalPlayer?.advanceReady) return;
       online.room.send(MMSG.continue);
       return;
     }
@@ -934,21 +959,20 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit, o
         </div>
       </Modal>}
 
-      {resultStage === 'cutin' && state.winner !== null && <div className="winner-cutin" role="dialog" aria-modal="true" data-ui-sfx="special" onClick={() => setResultStage('score')}>
+      {resultStage === 'settlement' && state.settlement && <div className={`result-backdrop settlement-showcase ${state.winner === null ? 'no-winner' : ''}`} data-ui-sfx="special">
         <div className="winner-speed-lines" aria-hidden="true" />
-        <img src={runtime.resolveAsset(winnerSkin.relativePath)} alt="" />
-        <div className="winner-call"><span>{state.winnerBy === 'selfDraw' ? t('single.selfDrawCall') : t('single.ronCall')}</span><strong>{winnerName}</strong><blockquote>「{winQuote}」</blockquote><small>{t('single.tapToContinue')}</small></div>
-      </div>}
-
-      {resultStage === 'score' && state.settlement && <div className="result-backdrop"><section className="settlement-panel" role="dialog" aria-modal="true">
+        {state.winner !== null && <img className="winner-portrait" src={runtime.resolveAsset(winnerSkin.relativePath)} alt="" />}
+        <section className="settlement-panel" role="dialog" aria-modal="true">
+        {state.winner !== null && <div className="winner-call"><span>{state.winnerBy === 'selfDraw' ? t('single.selfDrawCall') : t('single.ronCall')}</span><strong>{winnerName}</strong><blockquote>「{winQuote}」</blockquote></div>}
         <header><span className="result-emblem">{state.exhausted ? '流' : '和'}</span><div><h2>{state.exhausted ? t('single.draw') : t('single.winner', { name: winnerName })}</h2><p>{state.winnerBy === 'selfDraw' ? t('single.selfDraw') : state.winnerBy === 'discard' ? t('single.ron') : t('single.exhaustiveDraw')}</p></div></header>
         {state.winner !== null && <><div className="tai-total"><span>{t('single.taiTotal')}</span><strong>{state.settlement.tai} {t('single.taiUnit')}</strong></div><div className="tai-patterns">{state.settlement.patterns.map((pattern) => <span key={pattern.id}>{t(`single.tai.${pattern.id}`)} <b>+{pattern.tai}</b></span>)}</div></>}
         <div className="fund-settlement"><h3>{t('single.fundSettlement')}</h3>{state.settlement.deltas.map((delta, index) => <div key={index} className={delta > 0 ? 'positive' : delta < 0 ? 'negative' : ''}><span>{participantName(index)}{state.settlement?.bankruptPlayer === index && <em>{t('single.bankrupt')}</em>}</span><b>{state.points[index].toLocaleString()}</b><strong>{delta > 0 ? '+' : ''}{delta.toLocaleString()}</strong></div>)}</div>
         {state.settlement.bankruptPlayer !== null && <p className="bankruptcy-notice">{t('single.bankruptcyEnd', { name: participantName(state.settlement.bankruptPlayer) })}</p>}
         {online && <p className="online-advance-count">{t('online.advanceCount', { ready: online.view.advanceReadyCount, wind: prevailingWindLabel })}</p>}
-        <button className="primary-button" disabled={Boolean(onlineLocalPlayer?.advanceReady)} onClick={confirmHandSettlement}>{online
+        <div className="settlement-actions"><button className="primary-button" disabled={Boolean(onlineLocalPlayer?.advanceReady)} onClick={confirmHandSettlement}>{online
           ? onlineLocalPlayer?.advanceReady ? t('online.advanceReady') : state.matchComplete ? t('online.nextMatch') : state.circleComplete ? t('online.nextRound') : t('single.nextHand')
-          : state.settlement.bankruptPlayer !== null ? t('single.confirmSettlement') : state.circleComplete && !state.matchComplete ? t('single.nextRound') : t('single.nextHand')}</button>
+          : state.settlement.bankruptPlayer !== null ? t('single.confirmSettlement') : state.circleComplete && !state.matchComplete ? t('single.nextRound') : t('single.nextHand')}</button><button className="secondary-button" onClick={onExit}>{t('single.exit')}</button></div>
+        <SettlementCountdown active={!onlineLocalPlayer?.advanceReady} deadline={online?.view.turnDeadline} onElapsed={online ? undefined : confirmHandSettlement} />
       </section></div>}
 
       {!online && resultStage === 'coins' && <div className="result-backdrop"><section className="coin-result-panel" role="dialog" aria-modal="true">
