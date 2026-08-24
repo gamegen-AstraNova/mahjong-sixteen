@@ -27,12 +27,22 @@ export const ASSETS = {
   tileShell: 'textures/panel_tile_shell.png',
   tileBackCelestial: 'textures/panel_tile_back_daily.png',
   matchAction: {
-    chi: 'textures/txt_action_chi.png',
-    pong: 'textures/txt_action_pong.png',
-    kong: 'textures/txt_action_kong.png',
-    ready: 'textures/txt_action_ready.png',
-    win: 'textures/txt_action_win.png',
-    selfDraw: 'textures/txt_action_self_draw.png',
+    en: {
+      chi: 'textures/txt_action_chi_en.png', pong: 'textures/txt_action_pong_en.png', kong: 'textures/txt_action_kong_en.png',
+      ready: 'textures/txt_action_ready_en.png', win: 'textures/txt_action_win_en.png', selfDraw: 'textures/txt_action_self_draw_en.png',
+    },
+    'zh-TW': {
+      chi: 'textures/txt_action_chi.png', pong: 'textures/txt_action_pong.png', kong: 'textures/txt_action_kong.png',
+      ready: 'textures/txt_action_ready.png', win: 'textures/txt_action_win.png', selfDraw: 'textures/txt_action_self_draw.png',
+    },
+    'zh-CN': {
+      chi: 'textures/txt_action_chi.png', pong: 'textures/txt_action_pong.png', kong: 'textures/txt_action_kong_zh_cn.png',
+      ready: 'textures/txt_action_ready_zh_cn.png', win: 'textures/txt_action_win.png', selfDraw: 'textures/txt_action_self_draw.png',
+    },
+    ja: {
+      chi: 'textures/txt_action_chi_ja.png', pong: 'textures/txt_action_pong_ja.png', kong: 'textures/txt_action_kong_ja.png',
+      ready: 'textures/txt_action_ready_ja.png', win: 'textures/txt_action_win_ja.png', selfDraw: 'textures/txt_action_self_draw_ja.png',
+    },
   },
   bgmBase: 'audio/bgm_base.mp3',
   bgmRoom: 'audio/bgm_room.mp3',

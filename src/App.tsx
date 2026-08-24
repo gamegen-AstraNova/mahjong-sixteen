@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerE
 import { createPortal } from 'react-dom';
 import { ASSETS, tileFaceAsset } from './config/assets';
 import { CHARACTER_IDS, CHARACTER_SKINS, OUTFIT_THEME_SLUGS, TABLES, TILE_BACKS, floorBackgroundForOutfit, lobbyBackgroundForOutfit, uiThemeForOutfit } from './config/catalog';
-import { autoPlayCurrentTurn, claimDiscard, createInitialState, declareKong, declareReady, discardTile, kongTiles, passClaim, readyDiscardIndices, tileLabel, type ClaimOption, type MahjongState, type MeldKind, type TileId } from './game/mahjong';
+import { INITIAL_POINTS, TURN_TIME_SECONDS, autoPlayCurrentTurn, claimDiscard, createInitialState, declareKong, declareReady, discardTile, kongTiles, passClaim, readyDiscardIndices, seatWindForPlayer, startNextHand, tileLabel, waitingTiles, type ClaimOption, type MahjongState, type MeldKind, type TileId } from './game/mahjong';
 import { detectMatchActionSignals, matchActionDuration, type MatchActionKind, type MatchActionSignal } from './game/matchActionEvents';
 import { I18nProvider, useI18n } from './i18n/I18nProvider';
 import { MahjongTable3D } from './MahjongTable3D';
@@ -10,14 +10,13 @@ import { taipeiDailyKey } from './services/daily';
 import { BgmPlayer, type BgmScene } from './services/BgmPlayer';
 import { playMahjongSfx, UiSfxPlayer } from './services/UiSfxPlayer';
 import { claimMilestoneChoice, GACHA_COST_ONE, GACHA_COST_TEN, performGacha, type MilestoneChoiceKind } from './services/gacha';
-import { MahjongMultiplayerClient, MMSG, subscribeRoom, type MahjongRoom, type OnlineRoomSnapshot, type OpenMahjongRoom } from './services/multiplayer';
+import { MahjongMultiplayerClient, MMSG, subscribeRoom, type MahjongRoom, type OnlineEmote, type OnlineGameView, type OnlineRoomSnapshot, type OpenMahjongRoom } from './services/multiplayer';
 import type { PlatformRuntime } from './services/resourceLoader';
 import { loadProgress, saveProgress } from './services/storage';
 import { exportProgress, importProgress } from './services/transfer';
 import { SUPPORTED_LOCALES, type CharacterId, type GachaReward, type Locale, type PlayerProgress } from './types/game';
 
 type ModalName = 'language' | 'characters' | 'equipment' | 'gacha' | 'transfer' | 'online' | 'daily' | null;
-const TURN_TIME_SECONDS = 30;
 const HOME_DIALOGUE_LINE_COUNT = 10;
 const WIN_LINE_COUNT = 5;
 const GAME_POINTS_PER_COIN = 10;
@@ -198,27 +197,34 @@ function RewardOverlay({ rewards, runtime, onClose }: { rewards: GachaReward[]; 
     const timer = window.setTimeout(() => setRevealed(true), 1200);
     return () => window.clearTimeout(timer);
   }, []);
-  return (
+  return createPortal(
     <div className="reward-overlay">
-      <h2>{t('gacha.result')}</h2>
-      <div className={`reward-grid count-${rewards.length} ${revealed ? 'revealed' : ''}`}>
-        {rewards.map((reward, index) => (
-          <div className={`reward-card reward-${reward.kind}`} style={{ '--reward-index': index } as CSSProperties} key={`${reward.kind}-${index}`}>
-            <div className="reward-card-inner">
-              <div className="reward-card-face reward-card-back" aria-hidden={revealed}>
-                <img src={runtime.resolveAsset(ASSETS.rewardCardBack)} alt="" />
-              </div>
-              <div className="reward-card-face reward-card-front" aria-hidden={!revealed}>
-                <RewardPreview reward={reward} runtime={runtime} />
-                <strong>{rewardName(reward, t)}</strong>
-                {'duplicate' in reward && <small>{reward.duplicate ? t('gacha.duplicate') : t('gacha.new')}</small>}
+      <section className="reward-panel" role="dialog" aria-modal="true" aria-labelledby="reward-overlay-title">
+        <header className="modal-header">
+          <h2 id="reward-overlay-title">{t('gacha.result')}</h2>
+        </header>
+        <div className={`reward-grid count-${rewards.length} ${revealed ? 'revealed' : ''}`}>
+          {rewards.map((reward, index) => (
+            <div className={`reward-card reward-${reward.kind}`} style={{ '--reward-index': index } as CSSProperties} key={`${reward.kind}-${index}`}>
+              <div className="reward-card-inner">
+                <div className="reward-card-face reward-card-back" aria-hidden={revealed}>
+                  <img src={runtime.resolveAsset(ASSETS.rewardCardBack)} alt="" />
+                </div>
+                <div className="reward-card-face reward-card-front" aria-hidden={!revealed}>
+                  <RewardPreview reward={reward} runtime={runtime} />
+                  <strong>{rewardName(reward, t)}</strong>
+                  {'duplicate' in reward && <small>{reward.duplicate ? t('gacha.duplicate') : t('gacha.new')}</small>}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
-      <button className="primary-button" onClick={revealed ? onClose : () => setRevealed(true)}>{revealed ? t('action.close') : t('gacha.revealAll')}</button>
-    </div>
+          ))}
+        </div>
+        <footer className="reward-footer">
+          <button className="primary-button" onClick={revealed ? onClose : () => setRevealed(true)}>{revealed ? t('action.close') : t('gacha.revealAll')}</button>
+        </footer>
+      </section>
+    </div>,
+    document.querySelector('.app-theme') ?? document.body,
   );
 }
 
@@ -395,8 +401,11 @@ function OnlineModal({ runtime, progress, onBgmScene, onClose }: { runtime: Plat
   const [rooms, setRooms] = useState<OpenMahjongRoom[]>([]);
   const [room, setRoom] = useState<MahjongRoom | null>(null);
   const [snapshot, setSnapshot] = useState<OnlineRoomSnapshot | null>(null);
+  const [gameView, setGameView] = useState<OnlineGameView | null>(null);
+  const [emoteEvents, setEmoteEvents] = useState<Array<OnlineEmote & { id: number }>>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const nextOnlineEmoteId = useRef(1);
 
   const refresh = async () => {
     if (!client) return;
@@ -410,15 +419,20 @@ function OnlineModal({ runtime, progress, onBgmScene, onClose }: { runtime: Plat
   useEffect(() => { void refresh(); }, [client]);
   useEffect(() => {
     if (!room) return undefined;
-    const unsubscribe = subscribeRoom(room, setSnapshot);
+    const unsubscribe = subscribeRoom(room, {
+      onRoomChange: setSnapshot,
+      onGameState: setGameView,
+      onEmote: (message) => setEmoteEvents((events) => [...events, { ...message, id: nextOnlineEmoteId.current++ }]),
+      onRejected: () => setError(t('online.actionRejected')),
+    });
     return () => unsubscribe();
-  }, [room]);
+  }, [room, t]);
   useEffect(() => () => { if (room) void room.leave(true); }, [room]);
   useEffect(() => {
     if (!room || !snapshot) onBgmScene('base');
-    else if (snapshot.phase === 'playing' && snapshot.players.some((player) => player.ready)) onBgmScene('ready');
+    else if (snapshot.phase === 'playing' && gameView?.state.readyDeclared.some(Boolean)) onBgmScene('ready');
     else onBgmScene(snapshot.phase === 'playing' ? 'match' : 'room');
-  }, [onBgmScene, room, snapshot]);
+  }, [gameView, onBgmScene, room, snapshot]);
   useEffect(() => () => onBgmScene('base'), [onBgmScene]);
 
   const connect = async (roomId?: string) => {
@@ -447,6 +461,14 @@ function OnlineModal({ runtime, progress, onBgmScene, onClose }: { runtime: Plat
   if (room && snapshot) {
     const slots = Array.from({ length: 4 }, (_, slot) => snapshot.players.find((player) => player.slot === slot));
     const isHost = snapshot.hostSessionId === room.sessionId;
+    if (snapshot.phase === 'playing' && gameView) return <SinglePlayer
+      runtime={runtime}
+      progress={progress}
+      updateProgress={() => undefined}
+      onBgmScene={onBgmScene}
+      onExit={onClose}
+      online={{ room, snapshot, view: gameView, emoteEvents }}
+    />;
     return <Modal title={`${t('online.room')} ${snapshot.code}`} onClose={onClose} wide>
       <div className="online-room-screen">
         <div className={`connection-badge phase-${snapshot.phase}`}>{t(`online.phase.${snapshot.phase}`)}</div>
@@ -461,7 +483,7 @@ function OnlineModal({ runtime, progress, onBgmScene, onClose }: { runtime: Plat
           <p>{isHost ? t('online.startHint') : t('online.waitHost')}</p>
           <button className="primary-button" disabled={!isHost} onClick={() => room.send(MMSG.start)}>{t('online.start')}</button>
         </div>}
-        {snapshot.phase === 'playing' && <div className="online-sync-notice"><strong>{t('online.matchCreated')}</strong><p>{t('online.ruleEnginePending')}</p><small>Match #{snapshot.matchId} · Seed {snapshot.seed}</small></div>}
+        {snapshot.phase === 'playing' && <div className="online-sync-notice"><strong>{t('online.loadingMatch')}</strong></div>}
       </div>
     </Modal>;
   }
@@ -514,11 +536,13 @@ type MatchEmoteBurst = {
 
 const MATCH_EMOTES = ['😊', '😄', '😮', '😢', '😤', '🤔', '👏', '✨'] as const;
 const MATCH_STEP_DELAY_MS = 1_500;
+const WIND_KEYS = ['east', 'south', 'west', 'north'] as const;
 const TAI_HELP_PATTERNS = [
+  ['dealer', '1'], ['dealerStreak', '×2'],
   ['selfDraw', '1'], ['closed', '1'], ['closedSelfDrawBonus', '3'], ['ready', '1'],
   ['flowers', '×1'], ['allTriplets', '4'], ['allHonors', '16'], ['halfFlush', '4'],
   ['fullFlush', '8'], ['bigThreeDragons', '8'], ['smallThreeDragons', '4'],
-  ['redDragon', '1'], ['greenDragon', '1'], ['whiteDragon', '1'], ['seatWind', '1'], ['roundWind', '1'],
+  ['redDragon', '1'], ['greenDragon', '1'], ['whiteDragon', '1'], ['roundSeatWind', '1'],
 ] as const;
 
 function matchActionLabel(kind: MatchActionKind, t: ReturnType<typeof useI18n>['t']): string {
@@ -528,9 +552,17 @@ function matchActionLabel(kind: MatchActionKind, t: ReturnType<typeof useI18n>['
   return t(`single.claim.${kind}`);
 }
 
-function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }: { runtime: PlatformRuntime; progress: PlayerProgress; updateProgress(next: PlayerProgress): void; onBgmScene(scene: BgmScene): void; onExit(): void }) {
-  const { t } = useI18n();
-  const [state, setState] = useState(() => createInitialState());
+interface OnlineMatchConfig {
+  room: MahjongRoom;
+  snapshot: OnlineRoomSnapshot;
+  view: OnlineGameView;
+  emoteEvents: Array<OnlineEmote & { id: number }>;
+}
+
+function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit, online }: { runtime: PlatformRuntime; progress: PlayerProgress; updateProgress(next: PlayerProgress): void; onBgmScene(scene: BgmScene): void; onExit(): void; online?: OnlineMatchConfig }) {
+  const { locale, t } = useI18n();
+  const [singleState, setSingleState] = useState(() => createInitialState());
+  const state = online?.view.state ?? singleState;
   const [secondsLeft, setSecondsLeft] = useState(TURN_TIME_SECONDS);
   const [readyMode, setReadyMode] = useState(false);
   const [resultStage, setResultStage] = useState<ResultStage>(null);
@@ -546,6 +578,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
   const previousActionState = useRef(state);
   const nextActionId = useRef(1);
   const nextEmoteId = useRef(1);
+  const lastOnlineEmoteId = useRef(0);
   const activeAction = actionQueue[0] ?? null;
   const actionLocked = activeAction !== null;
   const activeHand = state.players[state.currentPlayer];
@@ -554,24 +587,30 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
   const turnToken = [state.currentPlayer, state.phase, state.wall.length, state.pendingDiscard?.player ?? '-', state.pendingDiscard?.tile ?? '-', activeHand?.concealed.length ?? 0, activeHand?.melds.length ?? 0, activeHand?.discards.length ?? 0].join(':');
   useEffect(() => { setClaimChoice(null); }, [turnToken]);
   useEffect(() => {
-    setSecondsLeft(TURN_TIME_SECONDS);
+    const deadline = online?.view.turnDeadline || Date.now() + TURN_TIME_SECONDS * 1_000;
+    setSecondsLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1_000)));
     if (state.settlement || actionLocked) return;
-    const deadline = Date.now() + TURN_TIME_SECONDS * 1_000;
     const interval = window.setInterval(() => setSecondsLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1_000))), 250);
-    const timeout = window.setTimeout(() => setState((current) => autoPlayCurrentTurn(current)), TURN_TIME_SECONDS * 1_000);
+    if (online) return () => window.clearInterval(interval);
+    const timeout = window.setTimeout(() => setSingleState((current) => autoPlayCurrentTurn(current)), TURN_TIME_SECONDS * 1_000);
     return () => { window.clearInterval(interval); window.clearTimeout(timeout); };
-  }, [actionLocked, turnToken, state.settlement]);
+  }, [actionLocked, online, online?.view.turnDeadline, turnToken, state.settlement]);
   useEffect(() => {
     if (state.settlement || actionLocked) return;
-    const shouldAutoPlay = state.currentPlayer !== 0 || autoPlayEnabled || state.readyDeclared[0];
+    const shouldAutoPlay = online
+      ? online.view.canAct && (autoPlayEnabled || (state.phase === 'discard' && state.readyDeclared[0]))
+      : state.currentPlayer !== 0 || autoPlayEnabled || state.readyDeclared[0];
     if (!shouldAutoPlay) return;
-    const timer = window.setTimeout(() => setState((current) => {
-      if (current.settlement) return current;
-      const stillAutoPlaying = current.currentPlayer !== 0 || autoPlayEnabled || current.readyDeclared[0];
-      return stillAutoPlaying ? autoPlayCurrentTurn(current) : current;
-    }), MATCH_STEP_DELAY_MS);
+    const timer = window.setTimeout(() => {
+      if (online) online.room.send(MMSG.action, { kind: 'auto' });
+      else setSingleState((current) => {
+        if (current.settlement) return current;
+        const stillAutoPlaying = current.currentPlayer !== 0 || autoPlayEnabled || current.readyDeclared[0];
+        return stillAutoPlaying ? autoPlayCurrentTurn(current) : current;
+      });
+    }, MATCH_STEP_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [actionLocked, autoPlayEnabled, state]);
+  }, [actionLocked, autoPlayEnabled, online, state]);
   useEffect(() => {
     const signals = detectMatchActionSignals(previousActionState.current, state);
     previousActionState.current = state;
@@ -607,9 +646,17 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
     setWinLine(1 + Math.floor(Math.random() * WIN_LINE_COUNT));
     if (state.winner === null) setResultStage('score');
   }, [state.settlement]);
+  useEffect(() => {
+    if (!online || state.settlement) return;
+    setResultStage(null);
+    setActionQueue([]);
+    setReadyMode(false);
+    setClaimChoice(null);
+  }, [online, state.settlement]);
   const player = state.players[0];
   const kongs = useMemo(() => kongTiles(state, 0), [state]);
   const readyOptions = useMemo(() => readyDiscardIndices(state, 0), [state]);
+  const readyWaits = useMemo(() => waitingTiles(state, 0), [state]);
   const discardClaimGroups = useMemo(() => {
     const groups = new Map<MeldKind, { option: ClaimOption; index: number }[]>();
     state.claimOptions.forEach((option, index) => {
@@ -620,31 +667,42 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
     });
     return groups;
   }, [state.claimOptions]);
-  const selectedSkin = CHARACTER_SKINS.find((skin) => skin.id === progress.selectedCharacterSkin) ?? CHARACTER_SKINS[0];
-  const winnerSkinId = state.winner === 0 ? selectedSkin.id : state.winner === null ? selectedSkin.id : AI_CHARACTER_SKINS[state.winner];
+  const onlinePlayers = online ? Array.from({ length: 4 }, (_, localSeat) => online.snapshot.players.find((player) => player.slot === (localSeat + online.view.playerSlot) % 4)) : null;
+  const onlineLocalPlayer = online?.snapshot.players.find((candidate) => candidate.id === online.room.sessionId);
+  const selectedSkinId = onlinePlayers?.[0]?.character ?? progress.selectedCharacterSkin;
+  const selectedSkin = CHARACTER_SKINS.find((skin) => skin.id === selectedSkinId) ?? CHARACTER_SKINS[0];
+  const winnerSkinId = state.winner === null
+    ? selectedSkin.id
+    : onlinePlayers?.[state.winner]?.character ?? (state.winner === 0 ? selectedSkin.id : AI_CHARACTER_SKINS[state.winner]);
   const winnerSkin = CHARACTER_SKINS.find((skin) => skin.id === winnerSkinId) ?? selectedSkin;
-  const participantName = (index: number) => index === 0 ? t('single.you') : t('single.computer', { number: index });
+  const participantName = (index: number) => onlinePlayers?.[index]?.name ?? (index === 0 ? t('single.you') : t('single.computer', { number: index }));
   const winnerName = state.winner === null ? '' : participantName(state.winner);
   const winQuote = t(`single.winLines.${winnerSkin.characterId}.${winLine}`);
 
-  const status = autoPlayEnabled ? t('matchTools.auto.status') : readyMode ? t('single.chooseReadyDiscard') : state.phase === 'claim' && state.pendingDiscard
+  const status = autoPlayEnabled ? t('matchTools.auto.status') : readyMode ? t('single.chooseReadyDiscard') : state.phase === 'claim' && state.pendingDiscard && (!online || online.view.canAct)
     ? t('single.claimPrompt', { tile: tileLabel(state.pendingDiscard.tile) })
-    : state.currentPlayer === 0 ? state.readyDeclared[0] ? t('single.readyAutoDiscard') : t('single.yourTurn') : t('single.computerThinking');
+    : state.currentPlayer === 0 && (!online || online.view.canAct) ? state.readyDeclared[0] ? t('single.readyAutoDiscard') : t('single.yourTurn') : t('single.computerThinking');
   const selectedTable = TABLES.find((item) => item.id === progress.selectedTable) ?? TABLES[0];
   const selectedTileBack = TILE_BACKS.find((item) => item.id === progress.selectedTileBack) ?? TILE_BACKS[0];
   const playableIndices = useMemo(() => player.concealed.flatMap((_, index) => {
-    const canAct = !autoPlayEnabled && state.currentPlayer === 0 && state.phase === 'discard' && !state.settlement && !actionLocked;
+    const canAct = !autoPlayEnabled && state.currentPlayer === 0 && state.phase === 'discard' && !state.settlement && !actionLocked && (!online || online.view.canAct);
     const readyCandidate = readyMode && readyOptions.includes(index);
     const allowed = canAct && (readyMode ? readyCandidate : !state.readyDeclared[0] || index === player.concealed.length - 1);
     return allowed ? [index] : [];
-  }), [actionLocked, autoPlayEnabled, player.concealed, readyMode, readyOptions, state.currentPlayer, state.phase, state.readyDeclared, state.settlement]);
-  const participantNames = useMemo(() => [0, 1, 2, 3].map(participantName) as [string, string, string, string], [t]);
-  const participantSkins = useMemo(() => [
-    selectedSkin.relativePath,
-    ...(AI_CHARACTER_SKINS.slice(1).map((skinId, index) => (CHARACTER_SKINS.find((skin) => skin.id === skinId) ?? CHARACTER_SKINS[index + 1]).relativePath)),
-  ] as [string, string, string, string], [selectedSkin.relativePath]);
+  }), [actionLocked, autoPlayEnabled, online, player.concealed, readyMode, readyOptions, state.currentPlayer, state.phase, state.readyDeclared, state.settlement]);
+  const participantNames = [0, 1, 2, 3].map(participantName) as [string, string, string, string];
+  const prevailingWindKey = WIND_KEYS[Number(state.prevailingWind.slice(1)) - 1];
+  const prevailingWindLabel = t(`single.wind.${prevailingWindKey}`);
+  const seatWindLabels = [0, 1, 2, 3].map((seat) => {
+    const seatWind = seatWindForPlayer(seat, state.eastSeat);
+    return t(`single.wind.${WIND_KEYS[Number(seatWind.slice(1)) - 1]}`);
+  }) as [string, string, string, string];
+  const participantSkins = useMemo(() => Array.from({ length: 4 }, (_, seat) => {
+    const skinId = onlinePlayers?.[seat]?.character ?? (seat === 0 ? selectedSkin.id : AI_CHARACTER_SKINS[seat]);
+    return (CHARACTER_SKINS.find((skin) => skin.id === skinId) ?? CHARACTER_SKINS[seat]).relativePath;
+  }) as [string, string, string, string], [onlinePlayers, selectedSkin.id]);
   const settleCoins = () => {
-    const pointDelta = state.settlement?.deltas[0] ?? 0;
+    const pointDelta = state.points[0] - INITIAL_POINTS;
     const converted = Math.trunc(pointDelta / GAME_POINTS_PER_COIN);
     const adjusted = converted > 0 && lowBalanceEntry ? Math.floor(converted / 2) : converted;
     const nextCoins = Math.max(0, progress.coins + adjusted);
@@ -652,26 +710,49 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
     updateProgress({ ...progress, coins: nextCoins });
     setResultStage('coins');
   };
+  const confirmHandSettlement = () => {
+    if (online) {
+      online.room.send(MMSG.continue);
+      return;
+    }
+    if (state.matchComplete) {
+      settleCoins();
+      return;
+    }
+    const nextState = startNextHand(state);
+    previousActionState.current = nextState;
+    setSingleState(nextState);
+    setActionQueue([]);
+    setResultStage(null);
+    setReadyMode(false);
+    setClaimChoice(null);
+    setSecondsLeft(TURN_TIME_SECONDS);
+    playMahjongSfx('tileArrange');
+  };
   const handlePlayerTileClick = (index: number) => {
     if (actionLocked || !playableIndices.includes(index)) return;
     if (readyMode) {
-      setState((current) => declareReady(current, index));
+      if (online) online.room.send(MMSG.action, { kind: 'ready', tileIndex: index });
+      else setSingleState((current) => declareReady(current, index));
       setReadyMode(false);
       return;
     }
-    setState((current) => discardTile(current, index));
+    if (online) online.room.send(MMSG.action, { kind: 'discard', tileIndex: index });
+    else setSingleState((current) => discardTile(current, index));
   };
   const requestDiscardClaim = (kind: MeldKind) => {
     const choices = discardClaimGroups.get(kind) ?? [];
     if (choices.length === 1) {
-      setState((current) => claimDiscard(current, choices[0].index));
+      if (online) online.room.send(MMSG.action, { kind: 'claim', optionIndex: choices[0].index });
+      else setSingleState((current) => claimDiscard(current, choices[0].index));
       return;
     }
     if (choices.length > 1) setClaimChoice({ source: 'discard', kind });
   };
   const requestKong = () => {
     if (kongs.length === 1) {
-      setState((current) => declareKong(current, kongs[0]));
+      if (online) online.room.send(MMSG.action, { kind: 'kong', tile: kongs[0] });
+      else setSingleState((current) => declareKong(current, kongs[0]));
       return;
     }
     if (kongs.length > 1) setClaimChoice({ source: 'kong', kind: 'kong' });
@@ -679,7 +760,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
   const restart = () => {
     const nextState = createInitialState();
     previousActionState.current = nextState;
-    setState(nextState);
+    setSingleState(nextState);
     setActionQueue([]);
     setResultStage(null);
     setReadyMode(false);
@@ -696,7 +777,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
       setClaimChoice(null);
     }
   };
-  const chooseEmote = (emote: string, seat: MatchEmoteBurst['seat'] = 0) => {
+  const showEmote = (emote: string, seat: MatchEmoteBurst['seat'] = 0) => {
     const spread = () => Math.round((Math.random() - .5) * 18);
     const paths: Record<MatchEmoteBurst['seat'], [number, number, number, number]> = {
       0: [spread(), 38 + Math.random() * 5, spread() * .65, 5 + Math.random() * 6],
@@ -716,6 +797,17 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
       rotation: Math.round((Math.random() - .5) * 22),
     }]);
   };
+  const chooseEmote = (emote: string) => {
+    if (online) online.room.send(MMSG.emote, { emote });
+    else showEmote(emote);
+  };
+  useEffect(() => {
+    if (!online) return;
+    online.emoteEvents.filter((event) => event.id > lastOnlineEmoteId.current).forEach((event) => {
+      lastOnlineEmoteId.current = Math.max(lastOnlineEmoteId.current, event.id);
+      showEmote(event.emote, ((event.seat - online.view.playerSlot + 4) % 4) as MatchEmoteBurst['seat']);
+    });
+  }, [online]);
   const matchToolIconStyle = (relativePath: string) => ({
     '--match-tool-icon': `url("${runtime.resolveAsset(relativePath)}")`,
   } as CSSProperties);
@@ -726,7 +818,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
         <strong>{t('single.rotateTitle')}</strong>
         <small>{t('single.rotateHint')}</small>
       </section>
-      <header className="game-topbar"><button className="secondary-button" onClick={onExit}>← {t('single.exit')}</button><div><strong>{t('single.title')}</strong><small>{t('single.rulesNote')}</small></div><span>{t('single.wall', { count: state.wall.length })}</span></header>
+      <header className="game-topbar"><button className="secondary-button" onClick={onExit}>← {t('single.exit')}</button><div><strong>{online ? t('online.matchTitle', { code: online.snapshot.code }) : t('single.title')}</strong><small>{t('single.roundStatus', { wind: prevailingWindLabel, hand: state.handNumber + 1, dealer: participantName(state.dealer) })} · {t('single.rulesNote')}</small></div><span>{t('single.wall', { count: state.wall.length })}</span></header>
       <div className="match-table-shell">
         <MahjongTable3D
           runtime={runtime}
@@ -738,6 +830,9 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
           participantSkins={participantSkins}
           status={status}
           readyLabel={t('single.readyMarker')}
+          dealerLabel={t('single.dealerMarker')}
+          roundWindLabel={prevailingWindLabel}
+          seatWindLabels={seatWindLabels}
           secondsLeft={secondsLeft}
           playableIndices={playableIndices}
           readySelectionActive={readyMode}
@@ -746,27 +841,31 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
             seat: activeAction.seat,
             kind: activeAction.kind,
             label: matchActionLabel(activeAction.kind, t),
-            imageSrc: runtime.resolveAsset(ASSETS.matchAction[activeAction.kind]),
+            imageSrc: runtime.resolveAsset(ASSETS.matchAction[locale][activeAction.kind]),
           } : undefined}
           onPlayerTileClick={handlePlayerTileClick}
         />
-        {(state.phase === 'claim' || kongs.length > 0 || readyOptions.length > 0 || readyMode) && !autoPlayEnabled && !state.settlement && !actionLocked && <div className={`match-action-bar ${claimChoice ? 'choosing-meld' : ''}`}>
+        {state.readyDeclared[0] && !state.settlement && readyWaits.length > 0 && <section className="ready-waits-panel" aria-label={t('single.readyWaits')}>
+          <strong>{t('single.readyWaits')}</strong>
+          <div>{readyWaits.map(({ tile, remaining }) => <span key={tile}><ClaimTileSet runtime={runtime} tiles={[tile]} /><small>{t('single.readyRemaining', { count: remaining })}</small></span>)}</div>
+        </section>}
+        {(state.phase === 'claim' || kongs.length > 0 || readyOptions.length > 0 || readyMode) && (!online || online.view.canAct) && !autoPlayEnabled && !state.settlement && !actionLocked && <div className={`match-action-bar ${claimChoice ? 'choosing-meld' : ''}`}>
           {claimChoice?.source === 'discard' && (discardClaimGroups.get(claimChoice.kind) ?? []).map(({ option, index }) => <button
             className="claim-option-button"
             key={`${claimChoice.kind}-${index}`}
             aria-label={`${t(`single.claim.${claimChoice.kind}`)} ${option.tiles.map(tileLabel).join(' ')}`}
-            onClick={() => setState((current) => claimDiscard(current, index))}
+            onClick={() => { if (online) online.room.send(MMSG.action, { kind: 'claim', optionIndex: index }); else setSingleState((current) => claimDiscard(current, index)); }}
           ><ClaimTileSet runtime={runtime} tiles={option.tiles} /></button>)}
           {claimChoice?.source === 'kong' && kongs.map((tile) => <button
             className="claim-option-button"
             key={tile}
             aria-label={`${t('single.claim.kong')} ${tileLabel(tile)}`}
-            onClick={() => setState((current) => declareKong(current, tile))}
+            onClick={() => { if (online) online.room.send(MMSG.action, { kind: 'kong', tile }); else setSingleState((current) => declareKong(current, tile)); }}
           ><ClaimTileSet runtime={runtime} tiles={[tile, tile, tile, tile]} /></button>)}
           {claimChoice && <button className="call-button call-pass" onClick={() => setClaimChoice(null)}>{t('action.cancel')}</button>}
-          {!claimChoice && state.phase === 'claim' && state.claimOptions.map((option, index) => option.kind === 'win' && <button className="call-button call-win" key={`win-${index}`} onClick={() => setState((current) => claimDiscard(current, index))}>{t('single.claim.win')}</button>)}
+          {!claimChoice && state.phase === 'claim' && state.claimOptions.map((option, index) => option.kind === 'win' && <button className="call-button call-win" key={`win-${index}`} onClick={() => { if (online) online.room.send(MMSG.action, { kind: 'claim', optionIndex: index }); else setSingleState((current) => claimDiscard(current, index)); }}>{t('single.claim.win')}</button>)}
           {!claimChoice && state.phase === 'claim' && [...discardClaimGroups.keys()].map((kind) => <button className={`call-button call-${kind}`} key={kind} onClick={() => requestDiscardClaim(kind)}>{t(`single.claim.${kind}`)}</button>)}
-          {!claimChoice && state.phase === 'claim' && <button className="call-button call-pass" onClick={() => setState(passClaim)}>{t('single.claim.pass')}</button>}
+          {!claimChoice && state.phase === 'claim' && <button className="call-button call-pass" onClick={() => { if (online) online.room.send(MMSG.action, { kind: 'pass' }); else setSingleState(passClaim); }}>{t('single.claim.pass')}</button>}
           {!claimChoice && state.phase === 'discard' && kongs.length > 0 && <button className="call-button call-kong" onClick={requestKong}>{t('single.claim.kong')}</button>}
           {!claimChoice && state.phase === 'discard' && readyOptions.length > 0 && <button className={`call-button call-ready ${readyMode ? 'active' : ''}`} onClick={() => setReadyMode((active) => !active)}>{readyMode ? t('action.cancel') : t('single.declareReady')}</button>}
         </div>}
@@ -815,6 +914,9 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
               <li>{t('matchTools.help.ruleFlowers')}</li>
               <li>{t('matchTools.help.ruleCalls')}</li>
               <li>{t('matchTools.help.ruleReady')}</li>
+              <li>{t('matchTools.help.ruleDealer')}</li>
+              <li>{t('matchTools.help.ruleWinds')}</li>
+              <li>{t('matchTools.help.ruleMatch')}</li>
             </ul>
           </section>
           <section>
@@ -826,7 +928,8 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
             <p>{t('matchTools.help.scoringFormula')}</p>
             <p>{t('matchTools.help.scoringDiscard')}</p>
             <p>{t('matchTools.help.scoringSelfDraw')}</p>
-            <p>{t('matchTools.help.scoringCoins', { points: GAME_POINTS_PER_COIN })}</p>
+            <p>{t('matchTools.help.scoringDealer')}</p>
+            <p>{online ? t('online.scoringNoCoins') : t('matchTools.help.scoringCoins', { points: GAME_POINTS_PER_COIN })}</p>
           </section>
         </div>
       </Modal>}
@@ -842,10 +945,13 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit }:
         {state.winner !== null && <><div className="tai-total"><span>{t('single.taiTotal')}</span><strong>{state.settlement.tai} {t('single.taiUnit')}</strong></div><div className="tai-patterns">{state.settlement.patterns.map((pattern) => <span key={pattern.id}>{t(`single.tai.${pattern.id}`)} <b>+{pattern.tai}</b></span>)}</div></>}
         <div className="fund-settlement"><h3>{t('single.fundSettlement')}</h3>{state.settlement.deltas.map((delta, index) => <div key={index} className={delta > 0 ? 'positive' : delta < 0 ? 'negative' : ''}><span>{participantName(index)}{state.settlement?.bankruptPlayer === index && <em>{t('single.bankrupt')}</em>}</span><b>{state.points[index].toLocaleString()}</b><strong>{delta > 0 ? '+' : ''}{delta.toLocaleString()}</strong></div>)}</div>
         {state.settlement.bankruptPlayer !== null && <p className="bankruptcy-notice">{t('single.bankruptcyEnd', { name: participantName(state.settlement.bankruptPlayer) })}</p>}
-        <button className="primary-button" onClick={settleCoins}>{t('single.confirmSettlement')}</button>
+        {online && <p className="online-advance-count">{t('online.advanceCount', { ready: online.view.advanceReadyCount, wind: prevailingWindLabel })}</p>}
+        <button className="primary-button" disabled={Boolean(onlineLocalPlayer?.advanceReady)} onClick={confirmHandSettlement}>{online
+          ? onlineLocalPlayer?.advanceReady ? t('online.advanceReady') : state.matchComplete ? t('online.nextMatch') : state.circleComplete ? t('online.nextRound') : t('single.nextHand')
+          : state.settlement.bankruptPlayer !== null ? t('single.confirmSettlement') : state.circleComplete && !state.matchComplete ? t('single.nextRound') : t('single.nextHand')}</button>
       </section></div>}
 
-      {resultStage === 'coins' && <div className="result-backdrop"><section className="coin-result-panel" role="dialog" aria-modal="true">
+      {!online && resultStage === 'coins' && <div className="result-backdrop"><section className="coin-result-panel" role="dialog" aria-modal="true">
         <span>🪙</span><h2>{coinDelta > 0 ? t('single.coinProfit') : coinDelta < 0 ? t('single.coinLoss') : t('single.coinEven')}</h2>
         <div className={`score-delta ${coinDelta >= 0 ? 'positive' : 'negative'}`}>{coinDelta > 0 ? '+' : ''}{coinDelta.toLocaleString()} 🪙</div>
         <small>{t('single.coinConversion', { points: GAME_POINTS_PER_COIN })}</small>

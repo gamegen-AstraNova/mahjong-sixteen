@@ -1,5 +1,6 @@
 export type Suit = 'm' | 'p' | 's';
 export type TileId = `${Suit}${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}` | `w${1 | 2 | 3 | 4}` | `d${1 | 2 | 3}` | `f${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`;
+export type WindTile = `w${1 | 2 | 3 | 4}`;
 export type MeldKind = 'chi' | 'pong' | 'kong';
 export type ClaimKind = 'win' | MeldKind;
 
@@ -9,24 +10,28 @@ export interface ClaimOption { kind: ClaimKind; consume: TileId[]; tiles: TileId
 export interface TaiPattern { id: string; tai: number; }
 export interface TaiResult { total: number; patterns: TaiPattern[]; }
 export interface HandSettlement { reason: 'win' | 'draw'; tai: number; patterns: TaiPattern[]; deltas: number[]; bankruptPlayer: number | null; }
+export interface RoundProgress { dealer: number; handNumber: number; dealerStreak: number; eastSeat?: number; prevailingWind?: WindTile; }
+export interface WaitingTileInfo { tile: TileId; remaining: number; }
 export type LastTileFocus =
   | { area: 'river'; seat: number; tile: TileId }
   | { area: 'meld'; seat: number; tile: TileId; meldIndex: number; tileIndex: number }
-  | { area: 'selfDraw'; seat: number; tile: TileId };
+  | { area: 'win'; seat: number; riverSeat: number; tile: TileId };
 export interface MahjongState {
   players: PlayerHand[]; wall: TileId[]; currentPlayer: number;
   winner: number | null; winnerBy: 'selfDraw' | 'discard' | null; loser: number | null; exhausted: boolean;
   phase: 'discard' | 'claim'; pendingDiscard: { player: number; tile: TileId } | null; claimOptions: ClaimOption[];
   lastDrawn: TileId | null; lastTileFocus: LastTileFocus | null;
   points: number[]; readyDeclared: boolean[]; settlement: HandSettlement | null;
+  dealer: number; eastSeat: number; prevailingWind: WindTile; handNumber: number; dealerStreak: number; circleComplete: boolean; matchComplete: boolean;
 }
 
 export const INITIAL_POINTS = 25_000;
 export const BASE_PAYMENT = 500;
 export const PAYMENT_PER_TAI = 200;
+export const TURN_TIME_SECONDS = 15;
 
 const SUITED: TileId[] = (['m', 'p', 's'] as const).flatMap((suit) => Array.from({ length: 9 }, (_, index) => `${suit}${index + 1}` as TileId));
-const WINDS: TileId[] = Array.from({ length: 4 }, (_, index) => `w${index + 1}` as TileId);
+const WINDS: WindTile[] = Array.from({ length: 4 }, (_, index) => `w${index + 1}` as WindTile);
 const DRAGONS: TileId[] = Array.from({ length: 3 }, (_, index) => `d${index + 1}` as TileId);
 const FLOWERS: TileId[] = Array.from({ length: 8 }, (_, index) => `f${index + 1}` as TileId);
 export const STANDARD_TILE_TYPES: TileId[] = [...SUITED, ...WINDS, ...DRAGONS];
@@ -81,7 +86,20 @@ function winningShapes(tiles: TileId[], openMelds = 0): WinningShape[] {
 export function isWinningHand(tiles: TileId[], openMeldCount = 0): boolean { return winningShapes(tiles, openMeldCount).length > 0; }
 function countTile(tiles: TileId[], target: TileId): number { return tiles.reduce((count, tile) => count + Number(tile === target), 0); }
 
-function scoreShape(hand: PlayerHand, shape: WinningShape, options: { selfDraw: boolean; ready: boolean; seat: number }): TaiResult {
+function dealerBonusPatterns(dealerStreak: number): TaiPattern[] {
+  return [
+    { id: 'dealer', tai: 1 },
+    ...(dealerStreak > 0 ? [{ id: 'dealerStreak', tai: dealerStreak * 2 }] : []),
+  ];
+}
+
+export function seatWindForPlayer(player: number, eastSeat: number): WindTile {
+  const normalizedPlayer = ((player % 4) + 4) % 4;
+  const normalizedEastSeat = ((eastSeat % 4) + 4) % 4;
+  return WINDS[(normalizedEastSeat - normalizedPlayer + 4) % 4];
+}
+
+function scoreShape(hand: PlayerHand, shape: WinningShape, options: { selfDraw: boolean; ready: boolean; seat: number; dealer: number; eastSeat: number; prevailingWind: WindTile; dealerStreak: number }): TaiResult {
   // The base stake is handled by BASE_PAYMENT and is not counted as a tai.
   const patterns: TaiPattern[] = [];
   const closed = hand.melds.every((meld) => meld.concealed);
@@ -105,45 +123,84 @@ function scoreShape(hand: PlayerHand, shape: WinningShape, options: { selfDraw: 
   if (dragonSets.length === 3) patterns.push({ id: 'bigThreeDragons', tai: 8 });
   else if (dragonSets.length === 2 && DRAGONS.includes(shape.pair)) patterns.push({ id: 'smallThreeDragons', tai: 4 });
   else dragonSets.forEach((tile) => patterns.push({ id: tile === 'd1' ? 'redDragon' : tile === 'd2' ? 'greenDragon' : 'whiteDragon', tai: 1 }));
-  const seatWind = `w${options.seat + 1}` as TileId;
-  if (triplets.has(seatWind)) patterns.push({ id: 'seatWind', tai: 1 });
-  if (triplets.has('w1')) patterns.push({ id: 'roundWind', tai: 1 });
+  const prevailingWindCall = hand.melds.some((meld) => (meld.kind === 'pong' || meld.kind === 'kong') && meld.tiles[0] === options.prevailingWind);
+  if (seatWindForPlayer(options.seat, options.eastSeat) === options.prevailingWind && prevailingWindCall) patterns.push({ id: 'roundSeatWind', tai: 1 });
+  if (options.seat === options.dealer) patterns.push(...dealerBonusPatterns(options.dealerStreak));
   return { total: patterns.reduce((sum, pattern) => sum + pattern.tai, 0), patterns };
 }
-export function calculateTai(hand: PlayerHand, options: { selfDraw: boolean; ready: boolean; seat: number }): TaiResult {
+export function calculateTai(hand: PlayerHand, options: { selfDraw: boolean; ready: boolean; seat: number; dealer: number; eastSeat: number; prevailingWind: WindTile; dealerStreak: number }): TaiResult {
   const results = winningShapes(hand.concealed, hand.melds.length).map((shape) => scoreShape(hand, shape, options));
   return results.sort((a, b) => b.total - a.total)[0] ?? { total: 0, patterns: [] };
 }
 
 function applyWinSettlement(state: MahjongState, winner: number, by: 'selfDraw' | 'discard', loser: number | null, winningTile?: TileId): void {
   const scoringHand = structuredClone(state.players[winner]); if (winningTile) scoringHand.concealed.push(winningTile);
-  const result = calculateTai(scoringHand, { selfDraw: by === 'selfDraw', ready: state.readyDeclared[winner], seat: winner });
-  const payment = BASE_PAYMENT + result.total * PAYMENT_PER_TAI;
+  const result = calculateTai(scoringHand, {
+    selfDraw: by === 'selfDraw',
+    ready: state.readyDeclared[winner],
+    seat: winner,
+    dealer: state.dealer,
+    eastSeat: state.eastSeat,
+    prevailingWind: state.prevailingWind,
+    dealerStreak: state.dealerStreak,
+  });
+  const dealerBonus = dealerBonusPatterns(state.dealerStreak);
+  const dealerBonusTai = dealerBonus.reduce((sum, pattern) => sum + pattern.tai, 0);
+  const dealerPaysWinner = winner !== state.dealer && (by === 'selfDraw' || loser === state.dealer);
+  const settlementPatterns = dealerPaysWinner ? [...result.patterns, ...dealerBonus] : result.patterns;
+  const settlementTai = result.total + (dealerPaysWinner ? dealerBonusTai : 0);
   const deltas = [0, 0, 0, 0];
   const charge = (payer: number, requested: number) => { const actual = Math.min(state.points[payer], requested); deltas[payer] -= actual; deltas[winner] += actual; };
-  if (by === 'selfDraw') for (let player = 0; player < 4; player += 1) { if (player !== winner) charge(player, payment); }
-  else if (loser !== null) charge(loser, payment);
+  const chargePlayer = (payer: number) => {
+    const tai = result.total + (winner !== state.dealer && payer === state.dealer ? dealerBonusTai : 0);
+    charge(payer, BASE_PAYMENT + tai * PAYMENT_PER_TAI);
+  };
+  if (by === 'selfDraw') for (let player = 0; player < 4; player += 1) { if (player !== winner) chargePlayer(player); }
+  else if (loser !== null) chargePlayer(loser);
   state.points = state.points.map((points, index) => Math.max(0, points + deltas[index]));
   state.winner = winner; state.winnerBy = by; state.loser = loser; state.phase = 'discard'; state.claimOptions = [];
-  const selfDrawTile = winningTile ?? state.lastDrawn;
-  if (by === 'selfDraw' && selfDrawTile) state.lastTileFocus = { area: 'selfDraw', seat: winner, tile: selfDrawTile };
+  const settlementTile = winningTile ?? state.lastDrawn;
+  if (settlementTile) state.lastTileFocus = { area: 'win', seat: winner, riverSeat: by === 'discard' && loser !== null ? loser : winner, tile: settlementTile };
   const bankrupt = state.points.findIndex((points) => points === 0);
-  state.settlement = { reason: 'win', tai: result.total, patterns: result.patterns, deltas, bankruptPlayer: bankrupt < 0 ? null : bankrupt };
+  state.settlement = { reason: 'win', tai: settlementTai, patterns: settlementPatterns, deltas, bankruptPlayer: bankrupt < 0 ? null : bankrupt };
+  state.circleComplete = winner !== state.dealer && state.handNumber >= 3;
+  state.matchComplete = bankrupt >= 0 || (state.circleComplete && state.prevailingWind === 'w4');
 }
 
-export function createInitialState(random: () => number = Math.random, initialPoints: number[] = Array.from({ length: 4 }, () => INITIAL_POINTS)): MahjongState {
+export function createInitialState(
+  random: () => number = Math.random,
+  initialPoints: number[] = Array.from({ length: 4 }, () => INITIAL_POINTS),
+  round: RoundProgress = { dealer: 0, handNumber: 0, dealerStreak: 0 },
+): MahjongState {
+  const eastSeat = round.eastSeat ?? Math.floor(random() * 4);
+  const prevailingWind = round.prevailingWind ?? 'w1';
   const shuffled = createWall(random); const dealPool = shuffled.filter((tile) => !isFlower(tile)); const flowers = shuffled.filter(isFlower);
   const players: PlayerHand[] = Array.from({ length: 4 }, () => ({ concealed: [], flowers: [], discards: [], melds: [] }));
   for (let round = 0; round < 16; round += 1) players.forEach((hand) => { const tile = dealPool.pop(); if (tile) hand.concealed.push(tile); });
   players.forEach((hand) => { hand.concealed = sortTiles(hand.concealed); });
-  const dealerTile = dealPool.pop() ?? null; if (dealerTile) players[0].concealed.push(dealerTile);
+  const dealerTile = dealPool.pop() ?? null; if (dealerTile) players[round.dealer].concealed.push(dealerTile);
   const state: MahjongState = {
-    players, wall: shuffleTiles([...dealPool, ...flowers], random), currentPlayer: 0, winner: null, winnerBy: null, loser: null, exhausted: false,
+    players, wall: shuffleTiles([...dealPool, ...flowers], random), currentPlayer: round.dealer, winner: null, winnerBy: null, loser: null, exhausted: false,
     phase: 'discard', pendingDiscard: null, claimOptions: [], lastDrawn: dealerTile, lastTileFocus: null,
     points: initialPoints.map((points) => Math.max(0, Math.floor(points))), readyDeclared: [false, false, false, false], settlement: null,
+    dealer: round.dealer, eastSeat, prevailingWind, handNumber: round.handNumber, dealerStreak: round.dealerStreak, circleComplete: false, matchComplete: false,
   };
-  if (isWinningHand(players[0].concealed)) applyWinSettlement(state, 0, 'selfDraw', null);
+  if (isWinningHand(players[round.dealer].concealed)) applyWinSettlement(state, round.dealer, 'selfDraw', null);
   return state;
+}
+
+export function startNextHand(source: MahjongState, random: () => number = Math.random): MahjongState {
+  if (!source.settlement || source.matchComplete) return source;
+  const dealerRetains = source.settlement.reason === 'draw' || source.winner === source.dealer;
+  const nextDealer = dealerRetains ? source.dealer : nextPlayer(source.dealer);
+  const nextPrevailingWind = source.circleComplete ? WINDS[WINDS.indexOf(source.prevailingWind) + 1] : source.prevailingWind;
+  return createInitialState(random, source.points, {
+    dealer: nextDealer,
+    eastSeat: source.eastSeat,
+    prevailingWind: nextPrevailingWind,
+    handNumber: source.circleComplete ? 0 : dealerRetains ? source.handNumber : source.handNumber + 1,
+    dealerStreak: dealerRetains ? source.dealerStreak + 1 : 0,
+  });
 }
 
 function chiOptions(hand: TileId[], tile: TileId): ClaimOption[] {
@@ -168,10 +225,17 @@ export function getClaimOptions(state: MahjongState, playerIndex: number): Claim
   return options;
 }
 function removeTiles(hand: TileId[], targets: TileId[]) { targets.forEach((target) => { const index = hand.indexOf(target); if (index >= 0) hand.splice(index, 1); }); }
-function finishDiscardWin(state: MahjongState, player: number) { applyWinSettlement(state, player, 'discard', state.pendingDiscard?.player ?? null, state.pendingDiscard?.tile); }
+function finishDiscardWin(state: MahjongState, player: number) {
+  const pending = state.pendingDiscard;
+  if (!pending) return;
+  applyWinSettlement(state, player, 'discard', pending.player, pending.tile);
+  state.pendingDiscard = null;
+}
 function finishDraw(state: MahjongState) {
   state.exhausted = true; state.lastDrawn = null; const bankrupt = state.points.findIndex((points) => points === 0);
   state.settlement = { reason: 'draw', tai: 0, patterns: [], deltas: [0, 0, 0, 0], bankruptPlayer: bankrupt < 0 ? null : bankrupt };
+  state.circleComplete = false;
+  state.matchComplete = bankrupt >= 0;
 }
 function drawForPlayer(state: MahjongState, player: number) {
   const hand = state.players[player]; const drawn = drawReplacement(state.wall, hand); if (!drawn) { finishDraw(state); return; }
@@ -185,8 +249,11 @@ function applyMeldClaim(state: MahjongState, player: number, option: ClaimOption
   const pending = state.pendingDiscard; if (!pending) return; const hand = state.players[player]; removeTiles(hand.concealed, option.consume);
   const pile = state.players[pending.player].discards; if (pile.at(-1) === pending.tile) pile.pop();
   const meldIndex = hand.melds.length;
-  const tileIndex = Math.max(0, option.tiles.indexOf(pending.tile));
-  hand.melds.push({ kind: option.kind as MeldKind, tiles: option.tiles, fromPlayer: pending.player, concealed: false }); hand.concealed = sortTiles(hand.concealed);
+  const meldTiles = option.kind === 'chi'
+    ? (() => { const companions = sortTiles(option.consume); return [companions[0], pending.tile, companions[1]]; })()
+    : [...option.tiles];
+  const tileIndex = Math.max(0, meldTiles.indexOf(pending.tile));
+  hand.melds.push({ kind: option.kind as MeldKind, tiles: meldTiles, fromPlayer: pending.player, concealed: false }); hand.concealed = sortTiles(hand.concealed);
   state.lastTileFocus = { area: 'meld', seat: player, tile: pending.tile, meldIndex, tileIndex };
   state.currentPlayer = player; state.pendingDiscard = null; state.claimOptions = []; state.phase = 'discard'; state.lastDrawn = null; if (option.kind === 'kong') drawForPlayer(state, player);
 }
@@ -218,14 +285,55 @@ export function readyDiscardIndices(state: MahjongState, player: number): number
   hand.concealed.forEach((_, index) => { const after = hand.concealed.filter((__, tileIndex) => tileIndex !== index); if (STANDARD_TILE_TYPES.some((candidate) => countTile(after, candidate) < 4 && isWinningHand([...after, candidate], hand.melds.length))) results.push(index); });
   return results;
 }
-function discardTileInternal(source: MahjongState, tileIndex: number, declaringReady: boolean): MahjongState {
-  if (source.winner !== null || source.exhausted || source.phase !== 'discard') return source;
-  const state = structuredClone(source); const player = state.currentPlayer; const hand = state.players[player];
+export function waitingTiles(state: MahjongState, player: number): WaitingTileInfo[] {
+  const hand = state.players[player];
+  if (!state.readyDeclared[player]) return [];
+  const concealed = [...hand.concealed];
+  if (concealed.length % 3 === 2 && state.currentPlayer === player && state.lastDrawn !== null) {
+    const drawnIndex = concealed.lastIndexOf(state.lastDrawn);
+    if (drawnIndex >= 0) concealed.splice(drawnIndex, 1);
+  }
+  if (concealed.length % 3 !== 1) return [];
+  const publiclyVisible = state.players.flatMap((candidate) => [
+    ...candidate.discards,
+    ...candidate.flowers,
+    ...candidate.melds.flatMap((meld) => meld.tiles),
+  ]);
+  return STANDARD_TILE_TYPES.flatMap((tile) => {
+    if (!isWinningHand([...concealed, tile], hand.melds.length)) return [];
+    const visible = countTile(hand.concealed, tile) + countTile(publiclyVisible, tile);
+    return [{ tile, remaining: Math.max(0, 4 - visible) }];
+  });
+}
+function discardTileAwaitingInternal(source: MahjongState, player: number, tileIndex: number, declaringReady: boolean): MahjongState {
+  if (source.winner !== null || source.exhausted || source.phase !== 'discard' || source.currentPlayer !== player) return source;
+  const state = structuredClone(source); const hand = state.players[player];
   if (!declaringReady && state.readyDeclared[player] && tileIndex !== hand.concealed.length - 1) return source;
   const [discarded] = hand.concealed.splice(tileIndex, 1); if (!discarded) return source;
   hand.concealed = sortTiles(hand.concealed); hand.discards.push(discarded); state.lastDrawn = null;
   state.lastTileFocus = { area: 'river', seat: player, tile: discarded };
-  state.pendingDiscard = { player, tile: discarded }; resolvePendingClaims(state); return state;
+  state.pendingDiscard = { player, tile: discarded }; state.phase = 'claim'; state.claimOptions = []; return state;
+}
+export function discardTileAwaitingClaims(source: MahjongState, player: number, tileIndex: number): MahjongState {
+  return discardTileAwaitingInternal(source, player, tileIndex, false);
+}
+export function declareReadyAwaitingClaims(source: MahjongState, player: number, tileIndex: number): MahjongState {
+  if (source.currentPlayer !== player || !readyDiscardIndices(source, player).includes(tileIndex)) return source;
+  const state = structuredClone(source); state.readyDeclared[player] = true; return discardTileAwaitingInternal(state, player, tileIndex, true);
+}
+export function claimDiscardForPlayer(source: MahjongState, player: number, optionIndex: number): MahjongState {
+  if (!source.pendingDiscard) return source;
+  const option = getClaimOptions(source, player)[optionIndex]; if (!option) return source;
+  const state = structuredClone(source); if (option.kind === 'win') finishDiscardWin(state, player); else applyMeldClaim(state, player, option); return state;
+}
+export function advanceAfterAllPasses(source: MahjongState): MahjongState {
+  if (!source.pendingDiscard) return source;
+  const state = structuredClone(source); advanceAfterDiscard(state); return state;
+}
+function discardTileInternal(source: MahjongState, tileIndex: number, declaringReady: boolean): MahjongState {
+  const state = discardTileAwaitingInternal(source, source.currentPlayer, tileIndex, declaringReady);
+  if (state === source) return source;
+  resolvePendingClaims(state); return state;
 }
 export function discardTile(source: MahjongState, tileIndex: number): MahjongState { return discardTileInternal(source, tileIndex, false); }
 export function declareReady(source: MahjongState, tileIndex: number): MahjongState {

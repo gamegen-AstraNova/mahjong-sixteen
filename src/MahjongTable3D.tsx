@@ -21,10 +21,12 @@ const OPEN_TILE_SCALE = 0.8;
 const WALL_TILE_SCALE = 0.54;
 const PLAYER_HAND_CAMERA_Y = -3.24;
 const PLAYER_HAND_CAMERA_Z = -11;
-const SEAT_HAND_Z = 6.02;
-const SEAT_BONUS_Z = 5.4;
+const OPPONENT_HAND_Z = 6.38;
 const SEAT_WALL_Z = 4.62;
-const SELF_DRAW_TILE_Z = 4.3;
+const SEAT_BONUS_Z = (
+  SEAT_WALL_Z + TILE_HEIGHT * WALL_TILE_SCALE / 2
+  + OPPONENT_HAND_Z - TILE_DEPTH / 2
+) / 2;
 const SEAT_BONUS_LEFT = -3.55;
 const BONUS_GROUP_GAP = 0.24;
 const SEAT_ROTATIONS = [0, -Math.PI / 2, Math.PI, Math.PI / 2] as const;
@@ -53,6 +55,9 @@ interface MahjongTable3DProps {
   participantSkins: [string, string, string, string];
   status: string;
   readyLabel: string;
+  dealerLabel: string;
+  roundWindLabel: string;
+  seatWindLabels: [string, string, string, string];
   secondsLeft: number;
   playableIndices: number[];
   readySelectionActive: boolean;
@@ -82,6 +87,8 @@ interface TableScene {
   centerDisplayCanvas: HTMLCanvasElement;
   centerDisplayTexture: THREE.CanvasTexture;
   lastTileMarkerTexture: THREE.CanvasTexture;
+  tileGlowTexture: THREE.CanvasTexture;
+  tileGlows: THREE.Mesh[];
   lastTileMarkers: THREE.Sprite[];
 }
 
@@ -89,6 +96,7 @@ interface TileVisualOptions {
   tile?: TileId;
   faceDown?: boolean;
   scale: number;
+  depthScale?: number;
   flat?: boolean;
   rotation?: number;
   interactiveIndex?: number;
@@ -98,6 +106,30 @@ interface TileVisualOptions {
 
 const bodyGeometry = new RoundedBoxGeometry(TILE_WIDTH, TILE_HEIGHT, TILE_DEPTH, 3, 0.055);
 const faceGeometry = new THREE.PlaneGeometry(TILE_WIDTH * 0.84, TILE_HEIGHT * 0.84);
+const TILE_GLOW_SIZE = TILE_HEIGHT * 1.87;
+const TILE_GLOW_TEXTURE_SIZE = 512;
+const tileGlowGeometry = new THREE.PlaneGeometry(TILE_GLOW_SIZE, TILE_GLOW_SIZE);
+
+function createTileGlowTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = TILE_GLOW_TEXTURE_SIZE;
+  canvas.height = TILE_GLOW_TEXTURE_SIZE;
+  const context = canvas.getContext('2d');
+  if (context) {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    const center = TILE_GLOW_TEXTURE_SIZE / 2;
+    const glow = context.createRadialGradient(center, center, 64, center, center, 232);
+    glow.addColorStop(0, 'rgba(255, 252, 202, 1)');
+    glow.addColorStop(.42, 'rgba(255, 224, 76, .92)');
+    glow.addColorStop(.72, 'rgba(255, 174, 24, .52)');
+    glow.addColorStop(1, 'rgba(255, 150, 0, 0)');
+    context.fillStyle = glow;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
 function createLastTileMarkerTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 192;
@@ -196,6 +228,7 @@ function makeTile(
   options: TileVisualOptions,
 ): THREE.Group {
   const scale = options.scale;
+  const depthScale = options.depthScale ?? 1;
   const tile = new THREE.Group();
   // Seat direction is a world-space yaw, while a table tile's face-down pose is
   // a local pitch. YXZ keeps those two rotations independent for the side seats.
@@ -230,21 +263,37 @@ function makeTile(
   }
 
   if (options.highlighted) {
+    const glow = new THREE.Mesh(tileGlowGeometry, new THREE.MeshBasicMaterial({
+      map: tableScene.tileGlowTexture,
+      transparent: true,
+      depthWrite: false,
+      depthTest: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    }));
+    // Flat tiles rotate local Z into table height. Keep their halo just beneath
+    // the upper tile surface so the body masks the centre without the table
+    // or rails cutting off the outer glow.
+    glow.position.z = options.flat ? TILE_DEPTH / 2 - 0.01 : -TILE_DEPTH / 2 - 0.012;
+    glow.renderOrder = 0;
+    tableScene.tileGlows.push(glow);
+    tile.add(glow);
     const edge = new THREE.LineSegments(
       new THREE.EdgesGeometry(bodyGeometry, 28),
       new THREE.LineBasicMaterial({ color: 0xffd766, transparent: true, opacity: 0.96 }),
     );
+    edge.renderOrder = 3;
     tile.add(edge);
   }
 
   if (options.flat) {
     tile.rotation.x = -Math.PI / 2;
-    tile.position.y = TILE_DEPTH * scale / 2 + 0.018;
+    tile.position.y = TILE_DEPTH * depthScale / 2 + 0.018;
   } else {
     tile.position.y = TILE_HEIGHT * scale / 2 + 0.018;
   }
   tile.rotation.y = options.rotation ?? 0;
-  tile.scale.setScalar(scale);
+  tile.scale.set(scale, scale, depthScale);
 
   if (options.interactiveIndex !== undefined) {
     tile.userData.playerTileIndex = options.interactiveIndex;
@@ -290,7 +339,7 @@ function configurePlayerHandTile(object: THREE.Object3D): void {
   });
 }
 
-function drawCenterDisplay(tableScene: TableScene, wallCount: number, secondsLeft: number): void {
+function drawCenterDisplay(tableScene: TableScene, wallCount: number, secondsLeft: number, roundWindLabel: string): void {
   const canvas = tableScene.centerDisplayCanvas;
   const context = canvas.getContext('2d');
   if (!context) return;
@@ -319,7 +368,7 @@ function drawCenterDisplay(tableScene: TableScene, wallCount: number, secondsLef
   context.font = '700 178px "Noto Serif TC", "Microsoft JhengHei", serif';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillText('東', 145, 278);
+  context.fillText(roundWindLabel, 145, 278);
 
   context.fillStyle = '#fff0a3';
   context.font = '800 86px system-ui, sans-serif';
@@ -359,6 +408,7 @@ function addRiver(
   backTexture: THREE.Texture,
   tiles: TileId[],
   markLast: boolean,
+  highlightLast: boolean,
 ): void {
   tiles.forEach((tileId, index) => {
     const column = index % RIVER_COLUMNS;
@@ -367,11 +417,34 @@ function addRiver(
       tile: tileId,
       flat: true,
       scale: RIVER_TILE_SCALE,
+      highlighted: highlightLast && index === tiles.length - 1,
     });
     setObjectPosition(tile, (column - 2.5) * RIVER_STEP_X, RIVER_ORIGIN_Z + row * RIVER_STEP_Z);
     parent.add(tile);
     if (markLast && index === tiles.length - 1) addLastTileMarker(parent, tableScene, tile);
   });
+}
+
+function remainingRiverCenter(discardCount: number): { x: number; z: number } {
+  const slotCount = RIVER_COLUMNS * RIVER_ROWS;
+  const firstOpenSlot = Math.min(Math.max(0, discardCount), slotCount - 1);
+  let x = 0;
+  let z = 0;
+  let openSlots = 0;
+  for (let index = firstOpenSlot; index < slotCount; index += 1) {
+    x += (index % RIVER_COLUMNS - 2.5) * RIVER_STEP_X;
+    z += RIVER_ORIGIN_Z + Math.floor(index / RIVER_COLUMNS) * RIVER_STEP_Z;
+    openSlots += 1;
+  }
+  return { x: x / openSlots, z: z / openSlots };
+}
+
+function riverHoldsWinningDiscard(state: MahjongState, riverSeat: SeatIndex): boolean {
+  return state.settlement?.reason === 'win'
+    && state.winnerBy === 'discard'
+    && state.lastTileFocus?.area === 'win'
+    && state.lastTileFocus.riverSeat === riverSeat
+    && state.players[riverSeat].discards.at(-1) === state.lastTileFocus.tile;
 }
 
 function addBonusTiles(
@@ -423,7 +496,12 @@ function addWall(
   for (let index = 0; index < count; index += 1) {
     const stack = Math.floor(index / 2);
     const level = index % 2;
-    const tile = makeTile(tableScene, faceTextures, backTexture, { faceDown: true, flat: true, scale: WALL_TILE_SCALE });
+    const tile = makeTile(tableScene, faceTextures, backTexture, {
+      faceDown: true,
+      flat: true,
+      scale: WALL_TILE_SCALE,
+      depthScale: WALL_TILE_SCALE,
+    });
     tile.position.y += level * TILE_DEPTH * WALL_TILE_SCALE * 0.92;
     setObjectPosition(tile, (stack - (stacks - 1) / 2) * step, SEAT_WALL_Z);
     parent.add(tile);
@@ -442,7 +520,8 @@ function addPlayerHand(
   const revealWinner = state.settlement?.reason === 'win' && state.winner === 0;
   const tiles = state.players[0].concealed;
   const step = TILE_WIDTH * PLAYER_TILE_SCALE * 1.02;
-  const drawnIndex = state.lastDrawn === null ? -1 : tiles.lastIndexOf(state.lastDrawn);
+  const playerOwnsCurrentDraw = state.currentPlayer === 0 && state.phase === 'discard' && !state.settlement;
+  const drawnIndex = playerOwnsCurrentDraw && state.lastDrawn !== null ? tiles.lastIndexOf(state.lastDrawn) : -1;
   const winningTile = revealWinner && state.winnerBy === 'selfDraw' ? state.lastDrawn : null;
   const winningIndex = winningTile === null ? -1 : tiles.lastIndexOf(winningTile);
   const separatedIndex = revealWinner ? -1 : drawnIndex;
@@ -491,37 +570,36 @@ function addSeatConcealedHand(
       flat: revealWinner,
       scale,
     });
-    setObjectPosition(tile, startX + displayIndex * step, SEAT_HAND_Z);
+    setObjectPosition(tile, startX + displayIndex * step, OPPONENT_HAND_Z);
     if (!revealWinner) tile.rotation.y = Math.PI;
     parent.add(tile);
   });
 }
 
-function addSelfDrawWinningTile(
+function addWinningTile(
   parent: THREE.Group,
   tableScene: TableScene,
   faceTextures: Map<TileId, THREE.Texture>,
   backTexture: THREE.Texture,
   state: MahjongState,
-  seat: SeatIndex,
+  riverSeat: SeatIndex,
 ): void {
   if (
     state.settlement?.reason !== 'win'
-    || state.winnerBy !== 'selfDraw'
-    || state.winner !== seat
-    || state.lastDrawn === null
+    || state.lastTileFocus?.area !== 'win'
+    || state.lastTileFocus.riverSeat !== riverSeat
   ) return;
   const tile = makeTile(tableScene, faceTextures, backTexture, {
-    tile: state.lastDrawn,
+    tile: state.lastTileFocus.tile,
     flat: true,
     scale: PLAYER_TILE_SCALE,
   });
-  setObjectPosition(tile, 0, SELF_DRAW_TILE_Z);
+  const occupiedTiles = state.players[riverSeat].discards.length - Number(riverHoldsWinningDiscard(state, riverSeat));
+  const position = remainingRiverCenter(occupiedTiles);
+  setObjectPosition(tile, position.x, position.z);
   tile.position.y += 0.05;
   parent.add(tile);
-  if (state.lastTileFocus?.area === 'selfDraw' && state.lastTileFocus.seat === seat) {
-    addLastTileMarker(parent, tableScene, tile);
-  }
+  if (riverSeat === 0) addLastTileMarker(parent, tableScene, tile);
 }
 
 function disposeObject(object: THREE.Object3D): void {
@@ -546,6 +624,9 @@ export function MahjongTable3D({
   participantSkins,
   status,
   readyLabel,
+  dealerLabel,
+  roundWindLabel,
+  seatWindLabels,
   secondsLeft,
   playableIndices,
   readySelectionActive,
@@ -612,6 +693,8 @@ export function MahjongTable3D({
     centerDisplayTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     const lastTileMarkerTexture = createLastTileMarkerTexture();
     lastTileMarkerTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    const tileGlowTexture = createTileGlowTexture();
+    tileGlowTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     const tableScene: TableScene = {
       renderer,
       scene,
@@ -628,10 +711,12 @@ export function MahjongTable3D({
       centerDisplayCanvas,
       centerDisplayTexture,
       lastTileMarkerTexture,
+      tileGlowTexture,
+      tileGlows: [],
       lastTileMarkers: [],
     };
     tableSceneRef.current = tableScene;
-    drawCenterDisplay(tableScene, state.wall.length, secondsLeft);
+    drawCenterDisplay(tableScene, state.wall.length, secondsLeft, roundWindLabel);
 
     const resize = () => {
       const { width, height } = mount.getBoundingClientRect();
@@ -701,6 +786,11 @@ export function MahjongTable3D({
           1,
         );
       });
+      tableScene.tileGlows.forEach((glow) => {
+        const pulse = 1 + Math.sin(elapsed * 4.8) * .055;
+        glow.scale.set(pulse, pulse, 1);
+        (glow.material as THREE.MeshBasicMaterial).opacity = .82 + Math.sin(elapsed * 4.8) * .12;
+      });
       renderer.clear();
       renderer.render(scene, camera);
       renderer.clearDepth();
@@ -720,6 +810,7 @@ export function MahjongTable3D({
       tableScene.textures.forEach((texture) => texture.dispose());
       tableScene.centerDisplayTexture.dispose();
       tableScene.lastTileMarkerTexture.dispose();
+      tableScene.tileGlowTexture.dispose();
       renderer.dispose();
       renderer.domElement.remove();
       tableSceneRef.current = null;
@@ -728,8 +819,8 @@ export function MahjongTable3D({
 
   useEffect(() => {
     const tableScene = tableSceneRef.current;
-    if (tableScene) drawCenterDisplay(tableScene, state.wall.length, secondsLeft);
-  }, [secondsLeft, state.wall.length]);
+    if (tableScene) drawCenterDisplay(tableScene, state.wall.length, secondsLeft, roundWindLabel);
+  }, [roundWindLabel, secondsLeft, state.wall.length]);
 
   useEffect(() => {
     const tableScene = tableSceneRef.current;
@@ -757,6 +848,7 @@ export function MahjongTable3D({
       if (tableScene.hovered) tableScene.hovered = null;
       tableScene.selectableMeshes.length = 0;
       tableScene.lastTileMarkers.length = 0;
+      tableScene.tileGlows.length = 0;
       disposeObject(tableScene.content);
       tableScene.content.clear();
       disposeObject(tableScene.playerHand);
@@ -809,14 +901,18 @@ export function MahjongTable3D({
       const playerWinnerRevealed = state.settlement?.reason === 'win' && state.winner === 0;
       ([0, 1, 2, 3] as SeatIndex[]).forEach((seat) => {
         const seatGroup = createSeatGroup(tableScene.content, seat);
+        const hand = state.players[seat];
+        const holdsDiscardedWinningTile = riverHoldsWinningDiscard(state, seat);
+        const riverTiles = holdsDiscardedWinningTile ? hand.discards.slice(0, -1) : hand.discards;
         if (seat !== 0 || playerWinnerRevealed) addSeatConcealedHand(seatGroup, tableScene, faceTextures, backTexture, state, seat);
         addRiver(
           seatGroup,
           tableScene,
           faceTextures,
           backTexture,
-          state.players[seat].discards,
-          state.lastTileFocus?.area === 'river' && state.lastTileFocus.seat === seat,
+          riverTiles,
+          seat === 0 && state.lastTileFocus?.area === 'river' && state.lastTileFocus.seat === seat,
+          seat === 0 && state.lastTileFocus?.area === 'river' && state.lastTileFocus.seat === seat,
         );
         addBonusTiles(
           seatGroup,
@@ -824,10 +920,10 @@ export function MahjongTable3D({
           faceTextures,
           backTexture,
           state.players[seat],
-          state.lastTileFocus?.area === 'meld' && state.lastTileFocus.seat === seat ? state.lastTileFocus : null,
+          seat === 0 && state.lastTileFocus?.area === 'meld' && state.lastTileFocus.seat === seat ? state.lastTileFocus : null,
         );
         addWall(seatGroup, tableScene, faceTextures, backTexture, wallCountForSeat(state.wall.length, seat));
-        addSelfDrawWinningTile(seatGroup, tableScene, faceTextures, backTexture, state, seat);
+        addWinningTile(seatGroup, tableScene, faceTextures, backTexture, state, seat);
       });
       if (!playerWinnerRevealed) addPlayerHand(tableScene.playerHand, tableScene, faceTextures, backTexture, state, playable, readySelectionActive);
     };
@@ -857,9 +953,13 @@ export function MahjongTable3D({
             style={participantStyle(seat)}
             tabIndex={seat === 0 ? 0 : undefined}
           >
+            <span className="match-seat-wind">{seatWindLabels[seat]}</span>
             <span className="match-seat-avatar"><img src={runtime.resolveAsset(participantSkins[seat])} alt="" /></span>
             <div><strong>{participantNames[seat]}</strong><b>{state.points[seat].toLocaleString()}</b></div>
-            {state.readyDeclared[seat] && <i>{readyLabel}</i>}
+            {(state.readyDeclared[seat] || state.dealer === seat) && <span className="match-seat-buffs">
+              {state.readyDeclared[seat] && <i className="ready">{readyLabel}</i>}
+              {state.dealer === seat && <i className="dealer">{dealerLabel}</i>}
+            </span>}
           </article>
         ))}
       </div>

@@ -1,8 +1,15 @@
 import { Client, type Room, type RoomAvailable } from 'colyseus.js';
+import type { MahjongState, TileId } from '../game/mahjong';
 
 export const MAHJONG_SIXTEEN_ROOM = 'mahjong-sixteen';
-export const MMSG = { start: 'mahjong:start' } as const;
-export const MEV = { matchStart: 'mahjong:match-start', actionRejected: 'mahjong:action-rejected' } as const;
+export const MMSG = { start: 'mahjong:start', action: 'mahjong:action', continue: 'mahjong:continue', emote: 'mahjong:emote' } as const;
+export const MEV = { matchStart: 'mahjong:match-start', roundStart: 'mahjong:round-start', gameState: 'mahjong:game-state', emote: 'mahjong:emote', actionRejected: 'mahjong:action-rejected' } as const;
+
+export type MahjongOnlineAction =
+  | { kind: 'discard' | 'ready'; tileIndex: number }
+  | { kind: 'kong'; tile: TileId }
+  | { kind: 'claim'; optionIndex: number }
+  | { kind: 'pass' | 'auto' };
 
 export interface MahjongRoomMeta {
   code?: string;
@@ -26,6 +33,7 @@ export interface OnlinePlayer {
   bot: boolean;
   host: boolean;
   ready: boolean;
+  advanceReady: boolean;
 }
 
 export interface OnlineRoomSnapshot {
@@ -34,7 +42,21 @@ export interface OnlineRoomSnapshot {
   hostSessionId: string;
   seed: number;
   matchId: number;
+  roundIndex: number;
   players: OnlinePlayer[];
+}
+
+export interface OnlineGameView {
+  state: MahjongState;
+  playerSlot: number;
+  canAct: boolean;
+  turnDeadline: number;
+  advanceReadyCount: number;
+}
+
+export interface OnlineEmote {
+  seat: number;
+  emote: string;
 }
 
 type SchemaPlayers = { forEach(callback: (player: Record<string, unknown>, id: string) => void): void };
@@ -53,6 +75,7 @@ function roomSnapshot(state: RoomState): OnlineRoomSnapshot {
       bot: player.bot === true,
       host: player.host === true,
       ready: player.ready === true || player.readyDeclared === true,
+      advanceReady: player.advanceReady === true,
     });
   });
   players.sort((left, right) => left.slot - right.slot);
@@ -62,7 +85,46 @@ function roomSnapshot(state: RoomState): OnlineRoomSnapshot {
     hostSessionId: String(state.hostSessionId ?? ''),
     seed: Number(state.seed ?? 0),
     matchId: Number(state.matchId ?? 0),
+    roundIndex: Math.max(0, Math.min(3, Number(state.roundIndex ?? 0))),
     players,
+  };
+}
+
+function rotateSeat(seat: number, localSlot: number): number { return (seat - localSlot + 4) % 4; }
+
+export function rotateMahjongState(state: MahjongState, localSlot: number): MahjongState {
+  const rotated = structuredClone(state);
+  rotated.players = Array.from({ length: 4 }, (_, localSeat) => {
+    const hand = structuredClone(state.players[(localSeat + localSlot) % 4]);
+    hand.melds.forEach((meld) => { if (meld.fromPlayer !== null) meld.fromPlayer = rotateSeat(meld.fromPlayer, localSlot); });
+    return hand;
+  });
+  rotated.points = Array.from({ length: 4 }, (_, localSeat) => state.points[(localSeat + localSlot) % 4]);
+  rotated.readyDeclared = Array.from({ length: 4 }, (_, localSeat) => state.readyDeclared[(localSeat + localSlot) % 4]);
+  rotated.currentPlayer = rotateSeat(state.currentPlayer, localSlot);
+  rotated.dealer = rotateSeat(state.dealer, localSlot);
+  rotated.eastSeat = rotateSeat(state.eastSeat, localSlot);
+  rotated.winner = state.winner === null ? null : rotateSeat(state.winner, localSlot);
+  rotated.loser = state.loser === null ? null : rotateSeat(state.loser, localSlot);
+  if (rotated.pendingDiscard) rotated.pendingDiscard.player = rotateSeat(rotated.pendingDiscard.player, localSlot);
+  if (rotated.lastTileFocus) {
+    rotated.lastTileFocus.seat = rotateSeat(rotated.lastTileFocus.seat, localSlot);
+    if (rotated.lastTileFocus.area === 'win') rotated.lastTileFocus.riverSeat = rotateSeat(rotated.lastTileFocus.riverSeat, localSlot);
+  }
+  return rotated;
+}
+
+function gameView(payload: unknown): OnlineGameView | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const source = payload as Record<string, unknown>;
+  const playerSlot = Math.max(0, Math.min(3, Number(source.playerSlot ?? 0)));
+  if (!source.state || typeof source.state !== 'object') return null;
+  return {
+    state: rotateMahjongState(source.state as MahjongState, playerSlot),
+    playerSlot,
+    canAct: source.canAct === true,
+    turnDeadline: Math.max(0, Number(source.turnDeadline ?? 0)),
+    advanceReadyCount: Math.max(0, Math.min(4, Number(source.advanceReadyCount ?? 0))),
   };
 }
 
@@ -93,15 +155,26 @@ export class MahjongMultiplayerClient {
   }
 }
 
-export function subscribeRoom(room: MahjongRoom, onChange: (snapshot: OnlineRoomSnapshot) => void): () => void {
-  const handler = (state: RoomState) => onChange(roomSnapshot(state));
+export function subscribeRoom(room: MahjongRoom, handlers: {
+  onRoomChange(snapshot: OnlineRoomSnapshot): void;
+  onGameState(view: OnlineGameView): void;
+  onEmote(message: OnlineEmote): void;
+  onRejected(): void;
+}): () => void {
+  const handler = (state: RoomState) => handlers.onRoomChange(roomSnapshot(state));
   room.onStateChange(handler);
   const offMatchStart = room.onMessage(MEV.matchStart, () => handler(room.state));
-  const offRejected = room.onMessage(MEV.actionRejected, () => undefined);
+  const offRoundStart = room.onMessage(MEV.roundStart, () => handler(room.state));
+  const offGameState = room.onMessage(MEV.gameState, (payload: unknown) => { const view = gameView(payload); if (view) handlers.onGameState(view); });
+  const offEmote = room.onMessage(MEV.emote, (payload: OnlineEmote) => handlers.onEmote(payload));
+  const offRejected = room.onMessage(MEV.actionRejected, handlers.onRejected);
   if (room.state) handler(room.state);
   return () => {
     room.onStateChange.remove(handler);
     if (typeof offMatchStart === 'function') offMatchStart();
+    if (typeof offRoundStart === 'function') offRoundStart();
+    if (typeof offGameState === 'function') offGameState();
+    if (typeof offEmote === 'function') offEmote();
     if (typeof offRejected === 'function') offRejected();
   };
 }
