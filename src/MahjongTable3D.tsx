@@ -599,7 +599,7 @@ function addWinningTile(
   setObjectPosition(tile, position.x, position.z);
   tile.position.y += 0.05;
   parent.add(tile);
-  if (riverSeat === 0) addLastTileMarker(parent, tableScene, tile);
+  addLastTileMarker(parent, tableScene, tile);
 }
 
 function disposeObject(object: THREE.Object3D): void {
@@ -904,6 +904,11 @@ export function MahjongTable3D({
         const hand = state.players[seat];
         const holdsDiscardedWinningTile = riverHoldsWinningDiscard(state, seat);
         const riverTiles = holdsDiscardedWinningTile ? hand.discards.slice(0, -1) : hand.discards;
+        const riverFocused = state.lastTileFocus?.area === 'river' && state.lastTileFocus.seat === seat;
+        const playerRiverHighlighted = seat === 0 && riverFocused;
+        const meldFocus = state.lastTileFocus?.area === 'meld' && state.lastTileFocus.seat === seat
+          ? state.lastTileFocus
+          : null;
         if (seat !== 0 || playerWinnerRevealed) addSeatConcealedHand(seatGroup, tableScene, faceTextures, backTexture, state, seat);
         addRiver(
           seatGroup,
@@ -911,8 +916,8 @@ export function MahjongTable3D({
           faceTextures,
           backTexture,
           riverTiles,
-          seat === 0 && state.lastTileFocus?.area === 'river' && state.lastTileFocus.seat === seat,
-          seat === 0 && state.lastTileFocus?.area === 'river' && state.lastTileFocus.seat === seat,
+          riverFocused,
+          playerRiverHighlighted,
         );
         addBonusTiles(
           seatGroup,
@@ -920,7 +925,7 @@ export function MahjongTable3D({
           faceTextures,
           backTexture,
           state.players[seat],
-          seat === 0 && state.lastTileFocus?.area === 'meld' && state.lastTileFocus.seat === seat ? state.lastTileFocus : null,
+          meldFocus,
         );
         addWall(seatGroup, tableScene, faceTextures, backTexture, wallCountForSeat(state.wall.length, seat));
         addWinningTile(seatGroup, tableScene, faceTextures, backTexture, state, seat);
