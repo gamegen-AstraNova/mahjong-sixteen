@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { tileFaceAsset } from './config/assets';
 import type { LastTileFocus, MahjongState, PlayerHand, TileId } from './game/mahjong';
 import type { MatchActionKind, MatchSeat } from './game/matchActionEvents';
+import { layoutMeldTiles } from './game/tableLayout';
 import { MatchActionCallout } from './MatchActionCallout';
 import type { PlatformRuntime } from './services/resourceLoader';
 import { playMahjongSfx } from './services/UiSfxPlayer';
@@ -455,23 +456,19 @@ function addBonusTiles(
   hand: PlayerHand,
   focus: LastTileFocus | null,
 ): void {
-  const openTiles = hand.melds.flatMap((meld, meldIndex) => meld.tiles.map((tile, tileIndex) => ({
-    tile,
-    faceDown: meld.concealed && (tileIndex === 0 || tileIndex === meld.tiles.length - 1),
-    meldIndex,
-    tileIndex,
-  })));
+  const openTiles = layoutMeldTiles(hand.melds);
   const bonusTiles = [
-    ...hand.flowers.map((tile) => ({ tile, faceDown: false, meldIndex: -1, tileIndex: -1 })),
+    ...hand.flowers.map((tile, slot) => ({ tile, faceDown: false, meldIndex: -1, tileIndex: -1, slot, stacked: false, open: false })),
     ...openTiles,
   ];
   if (bonusTiles.length === 0) return;
   const step = TILE_WIDTH * OPEN_TILE_SCALE;
   const groupGap = hand.flowers.length > 0 && openTiles.length > 0 ? BONUS_GROUP_GAP : 0;
-  bonusTiles.forEach((entry, index) => {
+  bonusTiles.forEach((entry) => {
     const tile = makeTile(tableScene, faceTextures, backTexture, { tile: entry.tile, faceDown: entry.faceDown, flat: true, scale: OPEN_TILE_SCALE });
-    const flowerBoundaryGap = index >= hand.flowers.length ? groupGap : 0;
-    setObjectPosition(tile, SEAT_BONUS_LEFT + index * step + flowerBoundaryGap, SEAT_BONUS_Z);
+    const slot = entry.open ? hand.flowers.length + entry.slot : entry.slot;
+    setObjectPosition(tile, SEAT_BONUS_LEFT + slot * step + (entry.open ? groupGap : 0), SEAT_BONUS_Z);
+    if (entry.stacked) tile.position.y += TILE_DEPTH * 0.94;
     parent.add(tile);
     if (focus?.area === 'meld' && entry.meldIndex === focus.meldIndex && entry.tileIndex === focus.tileIndex) {
       addLastTileMarker(parent, tableScene, tile);

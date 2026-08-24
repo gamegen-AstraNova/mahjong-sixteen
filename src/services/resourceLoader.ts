@@ -24,9 +24,11 @@ export interface PlatformRuntime {
   languagePacks: Record<Locale, Record<string, unknown>>;
   serverUrl: string;
   resolveAsset(relativePath: string): string;
+  getPreloadedAudio(relativePath: string): HTMLAudioElement | null;
 }
 
 const APP_BASE = import.meta.env.BASE_URL || './';
+const preloadedAudioByUrl = new Map<string, HTMLAudioElement>();
 
 function stripLeadingSlash(value: string): string {
   return value.trim().replace(/^\/+/, '');
@@ -62,21 +64,40 @@ async function fetchJson<T>(url: string): Promise<T | null> {
 
 function probeMedia(url: string, kind: 'image' | 'audio' | 'video'): Promise<boolean> {
   return new Promise((resolve) => {
-    const element = kind === 'image' ? new Image() : document.createElement(kind);
     let settled = false;
+    if (kind === 'image') {
+      const image = new Image();
+      const finish = (result: boolean) => {
+        if (settled) return;
+        settled = true;
+        image.onload = null;
+        image.onerror = null;
+        resolve(result);
+      };
+      image.onload = () => finish(true);
+      image.onerror = () => finish(false);
+      image.src = url;
+      return;
+    }
+
+    const media = document.createElement(kind);
     const finish = (result: boolean) => {
       if (settled) return;
       settled = true;
-      element.onload = null;
-      element.onerror = null;
-      element.onloadedmetadata = null;
+      media.oncanplay = null;
+      media.onerror = null;
+      if (result && kind === 'audio') preloadedAudioByUrl.set(url, media as HTMLAudioElement);
+      else {
+        media.removeAttribute('src');
+        media.load();
+      }
       resolve(result);
     };
-    element.onload = () => finish(true);
-    element.onloadedmetadata = () => finish(true);
-    element.onerror = () => finish(false);
-    if (kind !== 'image') (element as HTMLMediaElement).preload = 'metadata';
-    element.src = url;
+    media.oncanplay = () => finish(true);
+    media.onerror = () => finish(false);
+    media.preload = 'auto';
+    media.src = url;
+    media.load();
   });
 }
 
@@ -153,6 +174,10 @@ export async function bootstrapPlatform(): Promise<PlatformRuntime> {
     serverUrl,
     resolveAsset(relativePath: string) {
       return byPath.get(stripLeadingSlash(relativePath).toLowerCase()) ?? appUrl(`common/${stripLeadingSlash(relativePath)}`);
+    },
+    getPreloadedAudio(relativePath: string) {
+      const url = byPath.get(stripLeadingSlash(relativePath).toLowerCase());
+      return url ? preloadedAudioByUrl.get(url) ?? null : null;
     },
   };
 }
