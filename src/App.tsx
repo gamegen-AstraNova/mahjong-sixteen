@@ -541,7 +541,8 @@ const WIND_KEYS = ['east', 'south', 'west', 'north'] as const;
 const TAI_HELP_PATTERNS = [
   ['dealer', '1'], ['dealerStreak', '×2'],
   ['selfDraw', '1'], ['closed', '1'], ['closedSelfDrawBonus', '3'], ['ready', '1'],
-  ['flowers', '×1'], ['allTriplets', '4'], ['allHonors', '16'], ['halfFlush', '4'],
+  ['flowers', '×1'], ['threeConcealedTriplets', '2'], ['fourConcealedTriplets', '8'], ['fiveConcealedTriplets', '16'],
+  ['allTriplets', '4'], ['allHonors', '16'], ['halfFlush', '4'],
   ['fullFlush', '8'], ['bigThreeDragons', '8'], ['smallThreeDragons', '4'],
   ['redDragon', '1'], ['greenDragon', '1'], ['whiteDragon', '1'], ['roundSeatWind', '1'],
 ] as const;

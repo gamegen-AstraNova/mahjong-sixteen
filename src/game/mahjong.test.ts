@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SINGLE_PLAYER_TUNING, TURN_TIME_SECONDS, advanceAfterAllPasses, autoPlayCurrentTurn, calculateTai, chooseAiDiscard, claimDiscard, claimDiscardForPlayer, createInitialState, createWall, declareKong, declareReady, declareReadyAwaitingClaims, discardTile, discardTileAwaitingClaims, getClaimOptions, isFlower, isWinningHand, kongTiles, readyDiscardIndices, seatWindForPlayer, sortTiles, startNextHand, waitingTiles, type MahjongState, type PlayerHand, type TileId } from './mahjong';
+import { INITIAL_POINTS, SINGLE_PLAYER_TUNING, TURN_TIME_SECONDS, advanceAfterAllPasses, autoPlayCurrentTurn, calculateTai, chooseAiDiscard, claimDiscard, claimDiscardForPlayer, createInitialState, createWall, declareKong, declareReady, declareReadyAwaitingClaims, discardTile, discardTileAwaitingClaims, getClaimOptions, isFlower, isWinningHand, kongTiles, readyDiscardIndices, seatWindForPlayer, sortTiles, startNextHand, waitingTiles, type MahjongState, type PlayerHand, type TileId } from './mahjong';
 
 function hand(concealed: TileId[] = []): PlayerHand {
   return { concealed, flowers: [], discards: [], melds: [] };
@@ -21,7 +21,7 @@ function claimState(playerTiles: TileId[], discarded: TileId, discarder = 3): Ma
     claimOptions: [],
     lastDrawn: discarded,
     lastTileFocus: null,
-    points: [25_000, 25_000, 25_000, 25_000],
+    points: Array.from({ length: 4 }, () => INITIAL_POINTS),
     readyDeclared: [false, false, false, false],
     settlement: null,
     dealer: 0,
@@ -41,6 +41,11 @@ describe('Taiwan mahjong core', () => {
 
   it('creates a 144-tile wall', () => {
     expect(createWall(() => 0.5)).toHaveLength(144);
+  });
+
+  it('starts every seat with 8,000 points', () => {
+    expect(INITIAL_POINTS).toBe(8_000);
+    expect(createInitialState(() => 0.37).points).toEqual([8_000, 8_000, 8_000, 8_000]);
   });
 
   it('deals 17 tiles to the dealer and 16 to others without starting flowers', () => {
@@ -65,7 +70,7 @@ describe('Taiwan mahjong core', () => {
       claimOptions: [],
       lastDrawn: 'm1',
       lastTileFocus: null,
-      points: [25_000, 25_000, 25_000, 25_000],
+      points: Array.from({ length: 4 }, () => INITIAL_POINTS),
       readyDeclared: [false, false, false, false],
       settlement: null,
       dealer: 0,
@@ -128,7 +133,7 @@ describe('Taiwan mahjong core', () => {
   });
 
   it('deals the extra tile to the current dealer', () => {
-    const state = createInitialState(() => 0.37, [25_000, 25_000, 25_000, 25_000], { dealer: 2, handNumber: 2, dealerStreak: 0 });
+    const state = createInitialState(() => 0.37, Array.from({ length: 4 }, () => INITIAL_POINTS), { dealer: 2, handNumber: 2, dealerStreak: 0 });
     expect(state.players.map((player) => player.concealed.length)).toEqual([16, 16, 17, 16]);
     expect(state.currentPlayer).toBe(2);
   });
@@ -193,6 +198,28 @@ describe('Taiwan mahjong core', () => {
     expect(result.patterns).toContainEqual({ id: 'closedSelfDrawBonus', tai: 3 });
     expect(result.patterns.map((pattern) => pattern.id)).toEqual(expect.arrayContaining(['ready', 'allTriplets', 'fullFlush']));
     expect(result.patterns.map((pattern) => pattern.id)).not.toEqual(expect.arrayContaining(['selfDraw', 'closed']));
+  });
+
+  it('awards the highest applicable concealed-triplet pattern', () => {
+    const options = { selfDraw: true, ready: false, seat: 1, dealer: 0, eastSeat: 0, prevailingWind: 'w1' as const, dealerStreak: 0 };
+    const three = hand(['d1', 'd1', 'd1', 'd2', 'd2', 'd2', 'd3', 'd3', 'd3', 'm1', 'm2', 'm3', 'p1', 'p2', 'p3', 'w1', 'w1']);
+    const four = hand(['d1', 'd1', 'd1', 'd2', 'd2', 'd2', 'd3', 'd3', 'd3', 'w1', 'w1', 'w1', 'm1', 'm2', 'm3', 'w2', 'w2']);
+    const five = hand(['d1', 'd1', 'd1', 'd2', 'd2', 'd2', 'd3', 'd3', 'd3', 'w1', 'w1', 'w1', 'w2', 'w2', 'w2', 'w3', 'w3']);
+
+    expect(calculateTai(three, options).patterns).toContainEqual({ id: 'threeConcealedTriplets', tai: 2 });
+    expect(calculateTai(four, options).patterns).toContainEqual({ id: 'fourConcealedTriplets', tai: 8 });
+    expect(calculateTai(five, options).patterns).toContainEqual({ id: 'fiveConcealedTriplets', tai: 16 });
+  });
+
+  it('counts concealed kongs as concealed triplets and excludes a triplet completed by discard', () => {
+    const concealedKong = hand(['d1', 'd1', 'd1', 'd2', 'd2', 'd2', 'm1', 'm2', 'm3', 'p1', 'p2', 'p3', 'w1', 'w1']);
+    concealedKong.melds.push({ kind: 'kong', tiles: ['w2', 'w2', 'w2', 'w2'], fromPlayer: null, concealed: true });
+    const options = { selfDraw: true, ready: false, seat: 1, dealer: 0, eastSeat: 0, prevailingWind: 'w1' as const, dealerStreak: 0 };
+    expect(calculateTai(concealedKong, options).patterns).toContainEqual({ id: 'threeConcealedTriplets', tai: 2 });
+
+    const discardCompleted = hand(['d1', 'd1', 'd1', 'd2', 'd2', 'd2', 'd3', 'd3', 'd3', 'm1', 'm2', 'm3', 'p1', 'p2', 'p3', 'w1', 'w1']);
+    const result = calculateTai(discardCompleted, { ...options, selfDraw: false, winningTile: 'd3' });
+    expect(result.patterns.some((pattern) => pattern.id === 'threeConcealedTriplets')).toBe(false);
   });
 
   it('opens a player claim window and applies chi', () => {
@@ -284,7 +311,7 @@ describe('Taiwan mahjong core', () => {
     expect(won.players[3].discards).toEqual(['w1']);
     expect(won.pendingDiscard).toBeNull();
     expect(won.lastTileFocus).toEqual({ area: 'win', seat: 0, riverSeat: 3, tile: 'w1' });
-    expect(won.points).toEqual([26_100, 25_000, 25_000, 23_900]);
+    expect(won.points).toEqual([9_100, 8_000, 8_000, 6_900]);
     expect(won.settlement).toMatchObject({ tai: 3, deltas: [1_100, 0, 0, -1_100] });
   });
 

@@ -103,7 +103,7 @@
       "ruleReady": "宣告听牌后牌型锁定；之后摸到非胡牌张时会自动打出。",
       "ruleDealer": "庄家胡牌或流局时连庄并累加连庄数，且不推进当前局数；闲家胡牌后依逆时针换庄。四个庄位都完成后进入下一圈，北风圈完成后才结束本局。",
       "ruleWinds": "中央仪表板显示当前圈风，依东、南、西、北共四圈进行。每圈四家都当过庄家后进入下一圈；连庄不推进局数。固定座风与圈风相同者碰或杠该风牌加 1 台。",
-      "ruleMatch": "任何一家资金归零时本局立即于结算后结束；下一局四家资金重置为 25,000，并重新随机分配固定座风。",
+      "ruleMatch": "任何一家资金归零时本局立即于结算后结束；下一局四家资金重置为 8,000，并重新随机分配固定座风。",
       "scoringFormula": "每家应付金额＝基本 500 点＋合计台数 × 200 点。",
       "scoringDiscard": "放铳：仅由放铳者支付一次应付金额，不乘三倍。",
       "scoringSelfDraw": "自摸：其余三家各自支付一次应付金额。",
@@ -123,7 +123,7 @@
     "exhaustiveDraw": "牌墙耗尽，无人胡牌", "taiTotal": "合计台数", "taiUnit": "台", "fundSettlement": "局内资金结算", "bankrupt": "归零",
     "bankruptcyEnd": "{name} 的资金归零，本场提前结束。", "confirmSettlement": "确认结算", "coinProfit": "本局获得金币", "coinLoss": "本局损失金币", "coinEven": "本局金币持平",
     "coinConversion": "每 {points} 点局内资金换算 1 枚金币", "lowBalancePenalty": "低于最低入场资金时，胜局金币奖励减半。",
-    "tai": { "base": "基本胡", "dealer": "庄家", "dealerStreak": "连庄拉庄", "selfDraw": "自摸", "closed": "门清", "closedSelfDrawBonus": "门清一摸三", "ready": "听牌", "flowers": "花牌", "allTriplets": "碰碰胡", "allHonors": "字一色", "halfFlush": "混一色", "fullFlush": "清一色", "bigThreeDragons": "大三元", "smallThreeDragons": "小三元", "redDragon": "红中刻", "greenDragon": "青发刻", "whiteDragon": "白板刻", "roundSeatWind": "座风圈风刻" },
+    "tai": { "base": "基本胡", "dealer": "庄家", "dealerStreak": "连庄拉庄", "selfDraw": "自摸", "closed": "门清", "closedSelfDrawBonus": "门清一摸三", "ready": "听牌", "flowers": "花牌", "threeConcealedTriplets": "三暗刻", "fourConcealedTriplets": "四暗刻", "fiveConcealedTriplets": "五暗刻", "allTriplets": "碰碰胡", "allHonors": "字一色", "halfFlush": "混一色", "fullFlush": "清一色", "bigThreeDragons": "大三元", "smallThreeDragons": "小三元", "redDragon": "红中刻", "greenDragon": "青发刻", "whiteDragon": "白板刻", "roundSeatWind": "座风圈风刻" },
     "winLines": {
       "aya": { "1": "牌整理得很好。这一局，是我先等到答案了。", "2": "承让。先喝口茶，再慢慢看结算吧。", "3": "看来耐心没有辜负我。你也打得很好。", "4": "刚才那张，我等了很久。幸好没有心急。", "5": "这次是我赢了。下一局，也请别对我客气。" },
       "mio": { "1": "……胡了。嗯，判断没错。", "2": "牌到了。就这样。", "3": "赢了。你刚才那手，其实不差。", "4": "……结束。下一局再来。", "5": "运气有一点。剩下的是计算。" },

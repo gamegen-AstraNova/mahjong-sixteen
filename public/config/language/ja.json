@@ -103,7 +103,7 @@
       "ruleReady": "聴牌宣言後は手牌が固定され、和了牌以外のツモ牌は自動で捨てられます。",
       "ruleDealer": "親の和了または流局では連荘し、連荘回数が増えても現在の局数は進みません。子が和了すると反時計回りに親が移り、4人全員の親番が終わると次の場へ進みます。北場の終了後に一局が完了します。",
       "ruleWinds": "中央パネルは現在の場風を示し、東・南・西・北の4場を進行します。4人全員の親番が終わると次の場へ進み、連荘中は局数が進みません。固定席風と場風が一致する席がその風牌をポンまたはカンすると1台加算します。",
-      "ruleMatch": "いずれかの持ち点が0になった場合も精算後に対局終了です。次の対局では全員を25,000点に戻し、固定席風を再抽選します。",
+      "ruleMatch": "いずれかの持ち点が0になった場合も精算後に対局終了です。次の対局では全員を8,000点に戻し、固定席風を再抽選します。",
       "scoringFormula": "各家の支払額＝基本500点＋合計台数×200点。",
       "scoringDiscard": "ロン：放銃者のみが支払額を1回支払い、3倍にはなりません。",
       "scoringSelfDraw": "ツモ：他の3家がそれぞれ支払額を支払います。",
@@ -123,7 +123,7 @@
     "exhaustiveDraw": "牌山が尽き、流局しました", "taiTotal": "合計台数", "taiUnit": "台", "fundSettlement": "局内資金精算", "bankrupt": "ゼロ",
     "bankruptcyEnd": "{name} の資金がゼロになったため、対局を終了します。", "confirmSettlement": "精算を確認", "coinProfit": "今回獲得したコイン", "coinLoss": "今回失ったコイン", "coinEven": "コインの増減なし",
     "coinConversion": "局内資金 {points} 点をコイン1枚に換算", "lowBalancePenalty": "最低入場資金未満の場合、勝利報酬は半分になります。",
-    "tai": { "base": "基本和", "dealer": "親", "dealerStreak": "連荘・拉荘", "selfDraw": "自摸", "closed": "門前清", "closedSelfDrawBonus": "門清自摸加算", "ready": "聴牌", "flowers": "花牌", "allTriplets": "対々和", "allHonors": "字一色", "halfFlush": "混一色", "fullFlush": "清一色", "bigThreeDragons": "大三元", "smallThreeDragons": "小三元", "redDragon": "紅中刻", "greenDragon": "發財刻", "whiteDragon": "白板刻", "roundSeatWind": "席風・場風刻" },
+    "tai": { "base": "基本和", "dealer": "親", "dealerStreak": "連荘・拉荘", "selfDraw": "自摸", "closed": "門前清", "closedSelfDrawBonus": "門清自摸加算", "ready": "聴牌", "flowers": "花牌", "threeConcealedTriplets": "三暗刻", "fourConcealedTriplets": "四暗刻", "fiveConcealedTriplets": "五暗刻", "allTriplets": "対々和", "allHonors": "字一色", "halfFlush": "混一色", "fullFlush": "清一色", "bigThreeDragons": "大三元", "smallThreeDragons": "小三元", "redDragon": "紅中刻", "greenDragon": "發財刻", "whiteDragon": "白板刻", "roundSeatWind": "席風・場風刻" },
     "winLines": {
       "aya": { "1": "きれいにまとまりましたね。この局は、私が先に答えを待てたようです。", "2": "お疲れさま。お茶でも飲みながら、ゆっくり精算を見ましょう。", "3": "辛抱した甲斐がありました。あなたも良い打ち方でしたよ。", "4": "あの牌をずっと待っていました。焦らなくて正解でしたね。", "5": "今回は私の勝ちです。次も遠慮なく来てください。" },
       "mio": { "1": "……和了。うん、読みは合ってた。", "2": "牌が来た。それだけ。", "3": "勝った。さっきの一手、悪くなかった。", "4": "……終わり。次もやろう。", "5": "運も少し。残りは計算。" },

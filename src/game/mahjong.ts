@@ -31,7 +31,7 @@ export interface MahjongState {
   dealer: number; eastSeat: number; prevailingWind: WindTile; handNumber: number; dealerStreak: number; circleComplete: boolean; matchComplete: boolean;
 }
 
-export const INITIAL_POINTS = 25_000;
+export const INITIAL_POINTS = 8_000;
 export const BASE_PAYMENT = 500;
 export const PAYMENT_PER_TAI = 200;
 export const TURN_TIME_SECONDS = 15;
@@ -46,6 +46,7 @@ export const STANDARD_TILE_TYPES: TileId[] = [...SUITED, ...WINDS, ...DRAGONS];
 const tileOrder = new Map<TileId, number>([...STANDARD_TILE_TYPES, ...FLOWERS].map((tile, index) => [tile, index]));
 interface ShapeMeld { kind: 'sequence' | 'triplet'; tiles: TileId[]; }
 interface WinningShape { pair: TileId; melds: ShapeMeld[]; }
+interface TaiOptions { selfDraw: boolean; ready: boolean; seat: number; dealer: number; eastSeat: number; prevailingWind: WindTile; dealerStreak: number; winningTile?: TileId; }
 
 export function isFlower(tile: TileId): boolean { return tile.startsWith('f'); }
 export function sortTiles(tiles: TileId[]): TileId[] { return [...tiles].sort((a, b) => (tileOrder.get(a) ?? 999) - (tileOrder.get(b) ?? 999)); }
@@ -141,7 +142,7 @@ export function seatWindForPlayer(player: number, eastSeat: number): WindTile {
   return WINDS[(normalizedEastSeat - normalizedPlayer + 4) % 4];
 }
 
-function scoreShape(hand: PlayerHand, shape: WinningShape, options: { selfDraw: boolean; ready: boolean; seat: number; dealer: number; eastSeat: number; prevailingWind: WindTile; dealerStreak: number }): TaiResult {
+function scoreShape(hand: PlayerHand, shape: WinningShape, options: TaiOptions): TaiResult {
   // The base stake is handled by BASE_PAYMENT and is not counted as a tai.
   const patterns: TaiPattern[] = [];
   const closed = hand.melds.every((meld) => meld.concealed);
@@ -154,6 +155,12 @@ function scoreShape(hand: PlayerHand, shape: WinningShape, options: { selfDraw: 
   if (hand.flowers.length) patterns.push({ id: 'flowers', tai: hand.flowers.length });
   const melds = [...shape.melds, ...hand.melds.map((meld) => ({ kind: meld.kind === 'chi' ? 'sequence' as const : 'triplet' as const, tiles: meld.tiles }))];
   if (melds.every((meld) => meld.kind === 'triplet')) patterns.push({ id: 'allTriplets', tai: 4 });
+  const concealedShapeTriplets = shape.melds.filter((meld) => meld.kind === 'triplet' && (options.selfDraw || meld.tiles[0] !== options.winningTile)).length;
+  const concealedCalls = hand.melds.filter((meld) => meld.concealed && (meld.kind === 'pong' || meld.kind === 'kong')).length;
+  const concealedTriplets = concealedShapeTriplets + concealedCalls;
+  if (concealedTriplets >= 5) patterns.push({ id: 'fiveConcealedTriplets', tai: 16 });
+  else if (concealedTriplets === 4) patterns.push({ id: 'fourConcealedTriplets', tai: 8 });
+  else if (concealedTriplets === 3) patterns.push({ id: 'threeConcealedTriplets', tai: 2 });
   const allTiles = [...hand.concealed, ...hand.melds.flatMap((meld) => meld.tiles)].filter((tile) => !isFlower(tile));
   const suits = new Set(allTiles.filter((tile) => /^[mps]/u.test(tile)).map((tile) => tile[0]));
   const honors = allTiles.some((tile) => /^[wd]/u.test(tile));
@@ -170,7 +177,7 @@ function scoreShape(hand: PlayerHand, shape: WinningShape, options: { selfDraw: 
   if (options.seat === options.dealer) patterns.push(...dealerBonusPatterns(options.dealerStreak));
   return { total: patterns.reduce((sum, pattern) => sum + pattern.tai, 0), patterns };
 }
-export function calculateTai(hand: PlayerHand, options: { selfDraw: boolean; ready: boolean; seat: number; dealer: number; eastSeat: number; prevailingWind: WindTile; dealerStreak: number }): TaiResult {
+export function calculateTai(hand: PlayerHand, options: TaiOptions): TaiResult {
   const results = winningShapes(hand.concealed, hand.melds.length).map((shape) => scoreShape(hand, shape, options));
   return results.sort((a, b) => b.total - a.total)[0] ?? { total: 0, patterns: [] };
 }
@@ -185,6 +192,7 @@ function applyWinSettlement(state: MahjongState, winner: number, by: 'selfDraw' 
     eastSeat: state.eastSeat,
     prevailingWind: state.prevailingWind,
     dealerStreak: state.dealerStreak,
+    winningTile,
   });
   const dealerBonus = dealerBonusPatterns(state.dealerStreak);
   const dealerBonusTai = dealerBonus.reduce((sum, pattern) => sum + pattern.tai, 0);
