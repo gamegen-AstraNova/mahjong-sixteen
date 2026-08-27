@@ -90,6 +90,7 @@
     "confirmBody": "金币、持有内容与设置都会被替换，此操作无法撤销。", "success": "进度已成功导入。"
   },
   "daily": { "reward": "每日奖励", "claimed": "已获得 30,000 金币。", "reset": "每日 04:00（UTC+8）重置" },
+  "launch": { "enter": "进入游戏", "fullscreenHint": "以全屏模式打开完整游戏画面。" },
   "secret": { "reward": "发现彩蛋！+10,000 🪙" },
   "matchTools": {
     "label": "牌局功能",

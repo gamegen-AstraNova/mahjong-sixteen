@@ -96,6 +96,7 @@
     "confirmBody": "Coins, owned items and settings will be replaced. This cannot be undone.", "success": "Progress imported successfully."
   },
   "daily": { "reward": "Daily reward", "claimed": "30,000 coins received.", "reset": "Resets daily at 04:00 (UTC+8)" },
+  "launch": { "enter": "Enter Game", "fullscreenHint": "Enter the complete game view in fullscreen." },
   "secret": { "reward": "Secret discovered! +10,000 🪙" },
   "matchTools": {
     "label": "Match tools",

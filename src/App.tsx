@@ -41,20 +41,14 @@ function requestLandscapeOrientation(): void {
   }
 }
 
-function requestGamePresentation(): void {
+function requestGameFullscreen(): void {
   const root = document.documentElement;
-  const shouldUseFullscreen = window.matchMedia('(pointer: coarse)').matches;
-  if (!shouldUseFullscreen || document.fullscreenElement || !root.requestFullscreen) {
-    requestLandscapeOrientation();
-    return;
-  }
+  if (document.fullscreenElement || !root.requestFullscreen) return;
 
   try {
-    void root.requestFullscreen({ navigationUI: 'hide' })
-      .then(requestLandscapeOrientation)
-      .catch(requestLandscapeOrientation);
+    void root.requestFullscreen({ navigationUI: 'hide' }).catch(() => undefined);
   } catch {
-    requestLandscapeOrientation();
+    // Unsupported browsers continue with the dynamic viewport layout.
   }
 }
 
@@ -499,7 +493,7 @@ function OnlineModal({ runtime, progress, onBgmScene, onClose }: { runtime: Plat
         </div>
         {snapshot.phase === 'waiting' && <div className="online-room-actions">
           <p>{isHost ? t('online.startHint') : t('online.waitHost')}</p>
-          <button className="primary-button" disabled={!isHost} onClick={() => { requestGamePresentation(); room.send(MMSG.start); }}>{t('online.start')}</button>
+          <button className="primary-button" disabled={!isHost} onClick={() => room.send(MMSG.start)}>{t('online.start')}</button>
         </div>}
         {snapshot.phase === 'playing' && <div className="online-sync-notice"><strong>{t('online.loadingMatch')}</strong></div>}
       </div>
@@ -509,12 +503,12 @@ function OnlineModal({ runtime, progress, onBgmScene, onClose }: { runtime: Plat
   return <Modal title={t('home.online')} onClose={onClose} wide>
     <div className="online-lobby">
       <label>{t('online.nickname')}<input value={nickname} maxLength={16} onChange={(event) => setNickname(event.target.value)} /></label>
-      <div className="online-lobby-actions"><button className="primary-button" disabled={busy || !nickname.trim()} onClick={() => { requestGamePresentation(); void connect(); }}>{t('online.create')}</button><button className="secondary-button" disabled={busy} onClick={() => void refresh()}>{t('online.refresh')}</button></div>
+      <div className="online-lobby-actions"><button className="primary-button" disabled={busy || !nickname.trim()} onClick={() => void connect()}>{t('online.create')}</button><button className="secondary-button" disabled={busy} onClick={() => void refresh()}>{t('online.refresh')}</button></div>
       <div className="online-room-list">
         <h3>{t('online.roomList')}</h3>
         {busy && <p>{t('online.loading')}</p>}
         {!busy && rooms.length === 0 && <p>{t('online.noRooms')}</p>}
-        {rooms.map((available) => <button className="online-room-card" key={available.roomId} disabled={busy || !nickname.trim()} onClick={() => { requestGamePresentation(); void connect(available.roomId); }}>
+        {rooms.map((available) => <button className="online-room-card" key={available.roomId} disabled={busy || !nickname.trim()} onClick={() => void connect(available.roomId)}>
           <span><strong>{available.code}</strong><small>{available.hostName || t('online.unnamedHost')}</small></span>
           <span>{available.clients}/{available.maxClients}</span>
         </button>)}
@@ -1202,7 +1196,7 @@ function Lobby({ progress, updateProgress, runtime, openModal, startSingle }: {
         <div className="lobby-main-actions">
           <div className="mode-actions">
             <button className="mode-button offline" onClick={startSingle}><span className="mode-icon" style={{ '--mode-icon': `url("${offlineIcon}")` } as CSSProperties} aria-hidden="true" /><strong>{t('home.offline')}</strong></button>
-            <button className="mode-button online" onClick={() => { requestGamePresentation(); openModal('online'); }}><span className="mode-icon" style={{ '--mode-icon': `url("${onlineIcon}")` } as CSSProperties} aria-hidden="true" /><strong>{t('home.online')}</strong></button>
+            <button className="mode-button online" onClick={() => { requestLandscapeOrientation(); openModal('online'); }}><span className="mode-icon" style={{ '--mode-icon': `url("${onlineIcon}")` } as CSSProperties} aria-hidden="true" /><strong>{t('home.online')}</strong></button>
             <button className="mode-button gacha" onClick={() => openModal('gacha')}><span className="mode-icon" style={{ '--mode-icon': `url("${gachaIcon}")` } as CSSProperties} aria-hidden="true" /><strong>{t('action.gacha')}</strong></button>
           </div>
           <div className="feature-actions">
@@ -1227,13 +1221,13 @@ function GameApp({ runtime, progress, updateProgress }: { runtime: PlatformRunti
     {screen === 'single'
       ? <SinglePlayer runtime={runtime} progress={progress} updateProgress={updateProgress} onBgmScene={setBgmScene} onExit={() => { releaseOrientationLock(); setBgmScene('base'); setScreen('lobby'); }} />
       : <>
-        <Lobby progress={progress} updateProgress={updateProgress} runtime={runtime} openModal={setModal} startSingle={() => { requestGamePresentation(); setBgmScene('match'); setScreen('single'); }} />
+        <Lobby progress={progress} updateProgress={updateProgress} runtime={runtime} openModal={setModal} startSingle={() => { requestLandscapeOrientation(); setBgmScene('match'); setScreen('single'); }} />
         {modal === 'language' && <Modal title={t('language.title')} onClose={() => setModal(null)}><div className="language-list">{SUPPORTED_LOCALES.map((locale) => <button key={locale} className={progress.settings.locale === locale ? 'active' : ''} onClick={() => updateProgress({ ...progress, settings: { ...progress.settings, locale } })}>{t(`language.${locale}`)}</button>)}</div></Modal>}
         {modal === 'characters' && <CharacterModal progress={progress} runtime={runtime} updateProgress={updateProgress} onClose={() => setModal(null)} />}
         {modal === 'equipment' && <EquipmentModal progress={progress} runtime={runtime} updateProgress={updateProgress} onClose={() => setModal(null)} />}
         {modal === 'gacha' && <GachaModal progress={progress} runtime={runtime} updateProgress={updateProgress} onClose={() => setModal(null)} />}
         {modal === 'transfer' && <TransferModal progress={progress} updateProgress={updateProgress} onClose={() => setModal(null)} />}
-        {modal === 'online' && <OnlineModal runtime={runtime} progress={progress} onBgmScene={setBgmScene} onClose={() => { setBgmScene('base'); setModal(null); }} />}
+        {modal === 'online' && <OnlineModal runtime={runtime} progress={progress} onBgmScene={setBgmScene} onClose={() => { releaseOrientationLock(); setBgmScene('base'); setModal(null); }} />}
         {modal === 'daily' && <Modal title={t('daily.reward')} onClose={() => setModal(null)}><div className="daily-reward"><span>🪙</span><strong>30,000</strong><p>{t('daily.claimed')}</p><small>{t('daily.reset')}</small></div><button className="primary-button" onClick={() => setModal(null)}>{t('action.confirm')}</button></Modal>}
       </>}
   </>;
@@ -1244,13 +1238,14 @@ function isTextEntryTarget(target: EventTarget | null): boolean {
     && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 }
 
-function useSecretRewardTriggers(onActivate: () => void): void {
+function useSecretRewardTriggers(onActivate: () => void, enabled: boolean): void {
   const sequenceIndex = useRef(0);
   const holdTimer = useRef<number | null>(null);
   const holdPointer = useRef<{ id: number; x: number; y: number } | null>(null);
   const suppressCornerClickUntil = useRef(0);
 
   useEffect(() => {
+    if (!enabled) return undefined;
     const cancelHold = () => {
       if (holdTimer.current !== null) window.clearTimeout(holdTimer.current);
       holdTimer.current = null;
@@ -1310,12 +1305,28 @@ function useSecretRewardTriggers(onActivate: () => void): void {
       window.removeEventListener('click', onClick, true);
       window.removeEventListener('contextmenu', onContextMenu, true);
     };
-  }, [onActivate]);
+  }, [enabled, onActivate]);
 }
 
 function SecretRewardToast() {
   const { t } = useI18n();
   return <div className="secret-reward-toast" role="status" aria-live="assertive"><span aria-hidden="true">✦</span><strong>{t('secret.reward')}</strong><span aria-hidden="true">✦</span></div>;
+}
+
+function LaunchGate({ runtime, onEnter }: { runtime: PlatformRuntime; onEnter(): void }) {
+  const { t } = useI18n();
+  const enter = () => {
+    requestGameFullscreen();
+    onEnter();
+  };
+  return <main className="boot-loading-screen">
+    <div className="boot-loading-stars" aria-hidden="true"><i /><i /><i /><i /><i /></div>
+    <section className="boot-loading-card launch-card">
+      <img src={runtime.resolveAsset(ASSETS.logoHome)} alt={`${t('app.subtitle')} ${t('app.title')}`} />
+      <p>{t('launch.fullscreenHint')}</p>
+      <button className="primary-button launch-enter-button" onClick={enter}>{t('launch.enter')}</button>
+    </section>
+  </main>;
 }
 
 export function App({ runtime }: { runtime: PlatformRuntime }) {
@@ -1327,12 +1338,13 @@ export function App({ runtime }: { runtime: PlatformRuntime }) {
   });
   const [progress, setProgress] = useState<PlayerProgress>(initial.progress);
   const [showDaily, setShowDaily] = useState(initial.showDaily);
+  const [launched, setLaunched] = useState(false);
   const [secretRewardNotice, setSecretRewardNotice] = useState(0);
   const activateSecretReward = useCallback(() => {
     setProgress((current) => ({ ...current, coins: current.coins + SECRET_REWARD_COINS }));
     setSecretRewardNotice((current) => current + 1);
   }, []);
-  useSecretRewardTriggers(activateSecretReward);
+  useSecretRewardTriggers(activateSecretReward, launched);
   useEffect(() => { saveProgress(progress); }, [progress]);
   useEffect(() => {
     if (secretRewardNotice === 0) return undefined;
@@ -1351,8 +1363,10 @@ export function App({ runtime }: { runtime: PlatformRuntime }) {
         '--theme-tint-rgb': uiTheme.tintRgb,
         '--asset-ui-sparkle': `url("${runtime.resolveAsset(ASSETS.uiSparkle)}")`,
       } as CSSProperties}>
-        <GameApp runtime={runtime} progress={progress} updateProgress={setProgress} />
-        {showDaily && <DailyBridge onClose={() => setShowDaily(false)} />}
+        {launched
+          ? <GameApp runtime={runtime} progress={progress} updateProgress={setProgress} />
+          : <LaunchGate runtime={runtime} onEnter={() => setLaunched(true)} />}
+        {launched && showDaily && <DailyBridge onClose={() => setShowDaily(false)} />}
         {secretRewardNotice > 0 && <SecretRewardToast key={secretRewardNotice} />}
       </div>
     </I18nProvider>
