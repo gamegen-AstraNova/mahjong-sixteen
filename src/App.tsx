@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent as ReactWheelEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent as ReactWheelEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { ASSETS, tileFaceAsset } from './config/assets';
 import { CHARACTER_IDS, CHARACTER_SKINS, OUTFIT_THEME_SLUGS, TABLES, TILE_BACKS, floorBackgroundForOutfit, lobbyBackgroundForOutfit, uiThemeForOutfit } from './config/catalog';
@@ -12,6 +12,7 @@ import { playMahjongSfx, UiSfxPlayer } from './services/UiSfxPlayer';
 import { claimMilestoneChoice, GACHA_COST_ONE, GACHA_COST_TEN, performGacha, type MilestoneChoiceKind } from './services/gacha';
 import { MahjongMultiplayerClient, MMSG, subscribeRoom, type MahjongRoom, type OnlineEmote, type OnlineGameView, type OnlineRoomSnapshot, type OpenMahjongRoom } from './services/multiplayer';
 import type { PlatformRuntime } from './services/resourceLoader';
+import { advanceSecretSequence, SECRET_HOLD_DURATION_MS, SECRET_REWARD_COINS, SECRET_TRIGGER_CORNER_PX } from './services/secretReward';
 import { loadProgress, saveProgress } from './services/storage';
 import { exportProgress, importProgress } from './services/transfer';
 import { SUPPORTED_LOCALES, type CharacterId, type GachaReward, type Locale, type PlayerProgress } from './types/game';
@@ -1221,6 +1222,85 @@ function GameApp({ runtime, progress, updateProgress }: { runtime: PlatformRunti
   </>;
 }
 
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement
+    && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+}
+
+function useSecretRewardTriggers(onActivate: () => void): void {
+  const sequenceIndex = useRef(0);
+  const holdTimer = useRef<number | null>(null);
+  const holdPointer = useRef<{ id: number; x: number; y: number } | null>(null);
+  const suppressCornerClickUntil = useRef(0);
+
+  useEffect(() => {
+    const cancelHold = () => {
+      if (holdTimer.current !== null) window.clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+      holdPointer.current = null;
+    };
+    const isTopLeftCorner = (x: number, y: number) => x >= 0 && y >= 0
+      && x <= SECRET_TRIGGER_CORNER_PX && y <= SECRET_TRIGGER_CORNER_PX;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || isTextEntryTarget(event.target)) return;
+      const result = advanceSecretSequence(sequenceIndex.current, event.key);
+      sequenceIndex.current = result.nextIndex;
+      if (result.completed) onActivate();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType === 'mouse' || !isTopLeftCorner(event.clientX, event.clientY)) return;
+      cancelHold();
+      holdPointer.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      holdTimer.current = window.setTimeout(() => {
+        holdTimer.current = null;
+        holdPointer.current = null;
+        suppressCornerClickUntil.current = performance.now() + 1_000;
+        onActivate();
+      }, SECRET_HOLD_DURATION_MS);
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      const start = holdPointer.current;
+      if (start?.id === event.pointerId && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 16) cancelHold();
+    };
+    const onPointerEnd = (event: PointerEvent) => {
+      if (holdPointer.current?.id === event.pointerId) cancelHold();
+    };
+    const onClick = (event: MouseEvent) => {
+      if (performance.now() <= suppressCornerClickUntil.current && isTopLeftCorner(event.clientX, event.clientY)) {
+        suppressCornerClickUntil.current = 0;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    };
+    const onContextMenu = (event: MouseEvent) => {
+      if (holdPointer.current && isTopLeftCorner(event.clientX, event.clientY)) event.preventDefault();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('pointerdown', onPointerDown, true);
+    window.addEventListener('pointermove', onPointerMove, true);
+    window.addEventListener('pointerup', onPointerEnd, true);
+    window.addEventListener('pointercancel', onPointerEnd, true);
+    window.addEventListener('click', onClick, true);
+    window.addEventListener('contextmenu', onContextMenu, true);
+    return () => {
+      cancelHold();
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('pointerdown', onPointerDown, true);
+      window.removeEventListener('pointermove', onPointerMove, true);
+      window.removeEventListener('pointerup', onPointerEnd, true);
+      window.removeEventListener('pointercancel', onPointerEnd, true);
+      window.removeEventListener('click', onClick, true);
+      window.removeEventListener('contextmenu', onContextMenu, true);
+    };
+  }, [onActivate]);
+}
+
+function SecretRewardToast() {
+  const { t } = useI18n();
+  return <div className="secret-reward-toast" role="status" aria-live="assertive"><span aria-hidden="true">✦</span><strong>{t('secret.reward')}</strong><span aria-hidden="true">✦</span></div>;
+}
+
 export function App({ runtime }: { runtime: PlatformRuntime }) {
   const [initial] = useState(() => {
     const loaded = loadProgress();
@@ -1230,7 +1310,18 @@ export function App({ runtime }: { runtime: PlatformRuntime }) {
   });
   const [progress, setProgress] = useState<PlayerProgress>(initial.progress);
   const [showDaily, setShowDaily] = useState(initial.showDaily);
+  const [secretRewardNotice, setSecretRewardNotice] = useState(0);
+  const activateSecretReward = useCallback(() => {
+    setProgress((current) => ({ ...current, coins: current.coins + SECRET_REWARD_COINS }));
+    setSecretRewardNotice((current) => current + 1);
+  }, []);
+  useSecretRewardTriggers(activateSecretReward);
   useEffect(() => { saveProgress(progress); }, [progress]);
+  useEffect(() => {
+    if (secretRewardNotice === 0) return undefined;
+    const timer = window.setTimeout(() => setSecretRewardNotice(0), 2_800);
+    return () => window.clearTimeout(timer);
+  }, [secretRewardNotice]);
   const locale: Locale = progress.settings.locale;
   const selectedSkin = CHARACTER_SKINS.find((skin) => skin.id === progress.selectedCharacterSkin) ?? CHARACTER_SKINS[0];
   const uiTheme = uiThemeForOutfit(selectedSkin.outfitNumber);
@@ -1245,6 +1336,7 @@ export function App({ runtime }: { runtime: PlatformRuntime }) {
       } as CSSProperties}>
         <GameApp runtime={runtime} progress={progress} updateProgress={setProgress} />
         {showDaily && <DailyBridge onClose={() => setShowDaily(false)} />}
+        {secretRewardNotice > 0 && <SecretRewardToast key={secretRewardNotice} />}
       </div>
     </I18nProvider>
   );

@@ -90,6 +90,7 @@
     "confirmBody": "コイン、所持品、設定が置き換わります。この操作は元に戻せません。", "success": "進行状況を読み込みました。"
   },
   "daily": { "reward": "デイリー報酬", "claimed": "30,000コインを獲得しました。", "reset": "毎日04:00（UTC+8）更新" },
+  "secret": { "reward": "隠しコマンド成功！+10,000 🪙" },
   "matchTools": {
     "label": "対局機能",
     "emote": { "title": "スタンプ", "send": "{emote}を送信" },

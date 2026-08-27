@@ -1,6 +1,7 @@
 {
   "assets": [
     { "id": "logoHome", "type": "image", "relativePath": "textures/logo_astranova_mahjong.png", "cssVariable": null },
+    { "id": "iconSiteMahjong", "type": "image", "relativePath": "textures/icon_site_mahjong.png", "cssVariable": null },
     { "id": "visibilityView", "type": "image", "relativePath": "textures/icon_visibility_view.png", "cssVariable": null },
     { "id": "visibilityHide", "type": "image", "relativePath": "textures/icon_visibility_hide.png", "cssVariable": null },
     { "id": "modeOffline", "type": "image", "relativePath": "textures/icon_mode_offline.png", "cssVariable": null },

@@ -180,6 +180,33 @@ button { color: inherit; }
 .ui-hidden .character-stage { position: absolute; inset: 0; width: 100%; height: 100%; }
 .ui-hidden .character-art { left: 50%; }
 
+.secret-reward-toast {
+  position: fixed;
+  z-index: 140;
+  top: max(1rem, env(safe-area-inset-top));
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  max-width: calc(100vw - 2rem);
+  padding: .8rem 1.2rem;
+  border: 1px solid rgb(255 255 255 / .92);
+  border-radius: 999px;
+  color: var(--theme-accent-deep, #365d94);
+  background: color-mix(in srgb, rgb(255 255 255 / .9) 86%, var(--theme-secondary) 14%);
+  box-shadow: 0 .85rem 2.2rem rgb(55 67 82 / .22), inset 0 1px rgb(255 255 255 / .96);
+  backdrop-filter: blur(14px);
+  pointer-events: none;
+  animation: secret-reward-arrive 2.8s ease both;
+}
+.secret-reward-toast strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.secret-reward-toast span { color: var(--theme-secondary); filter: drop-shadow(0 0 .35rem rgb(255 255 255 / .96)); }
+@keyframes secret-reward-arrive {
+  0% { opacity: 0; transform: translate(-50%, -.8rem) scale(.92); }
+  12%, 82% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -.35rem) scale(.98); }
+}
+
 .modal-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); background: rgba(0, 8, 16, .74); backdrop-filter: blur(8px); }
 .modal-card { width: min(35rem, 96vw); max-height: min(88dvh, 56rem); display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line); border-radius: 1.5rem; background: linear-gradient(160deg, rgba(12, 49, 68, .98), rgba(5, 24, 39, .98)); box-shadow: 0 1.5rem 5rem rgba(0,0,0,.5); }
 .modal-wide { width: min(66rem, 96vw); }
