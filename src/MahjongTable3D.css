@@ -2,7 +2,7 @@
   position: relative;
   width: 100%;
   height: 100dvh;
-  min-height: 28rem;
+  min-height: 0;
   overflow: hidden;
   color: var(--ink);
   background: color-mix(in srgb, #fff 82%, var(--theme-accent) 18%);
@@ -707,6 +707,15 @@
   .match-seat-avatar {
     flex-basis: 2.3rem;
     width: 2.3rem;
+  }
+
+  .match-seat-0 {
+    bottom: max(.45rem, env(safe-area-inset-bottom));
+    transform: scale(1.1);
+  }
+
+  .match-seat-0:is(:hover, :focus-visible, :focus-within) {
+    transform: translateY(-.2rem) scale(1.1);
   }
 
   .match-action-bar {

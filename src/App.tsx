@@ -41,6 +41,23 @@ function requestLandscapeOrientation(): void {
   }
 }
 
+function requestGamePresentation(): void {
+  const root = document.documentElement;
+  const shouldUseFullscreen = window.matchMedia('(pointer: coarse)').matches;
+  if (!shouldUseFullscreen || document.fullscreenElement || !root.requestFullscreen) {
+    requestLandscapeOrientation();
+    return;
+  }
+
+  try {
+    void root.requestFullscreen({ navigationUI: 'hide' })
+      .then(requestLandscapeOrientation)
+      .catch(requestLandscapeOrientation);
+  } catch {
+    requestLandscapeOrientation();
+  }
+}
+
 function releaseOrientationLock(): void {
   const orientation = window.screen.orientation as LockableScreenOrientation | undefined;
   try {
@@ -482,7 +499,7 @@ function OnlineModal({ runtime, progress, onBgmScene, onClose }: { runtime: Plat
         </div>
         {snapshot.phase === 'waiting' && <div className="online-room-actions">
           <p>{isHost ? t('online.startHint') : t('online.waitHost')}</p>
-          <button className="primary-button" disabled={!isHost} onClick={() => room.send(MMSG.start)}>{t('online.start')}</button>
+          <button className="primary-button" disabled={!isHost} onClick={() => { requestGamePresentation(); room.send(MMSG.start); }}>{t('online.start')}</button>
         </div>}
         {snapshot.phase === 'playing' && <div className="online-sync-notice"><strong>{t('online.loadingMatch')}</strong></div>}
       </div>
@@ -492,12 +509,12 @@ function OnlineModal({ runtime, progress, onBgmScene, onClose }: { runtime: Plat
   return <Modal title={t('home.online')} onClose={onClose} wide>
     <div className="online-lobby">
       <label>{t('online.nickname')}<input value={nickname} maxLength={16} onChange={(event) => setNickname(event.target.value)} /></label>
-      <div className="online-lobby-actions"><button className="primary-button" disabled={busy || !nickname.trim()} onClick={() => void connect()}>{t('online.create')}</button><button className="secondary-button" disabled={busy} onClick={() => void refresh()}>{t('online.refresh')}</button></div>
+      <div className="online-lobby-actions"><button className="primary-button" disabled={busy || !nickname.trim()} onClick={() => { requestGamePresentation(); void connect(); }}>{t('online.create')}</button><button className="secondary-button" disabled={busy} onClick={() => void refresh()}>{t('online.refresh')}</button></div>
       <div className="online-room-list">
         <h3>{t('online.roomList')}</h3>
         {busy && <p>{t('online.loading')}</p>}
         {!busy && rooms.length === 0 && <p>{t('online.noRooms')}</p>}
-        {rooms.map((available) => <button className="online-room-card" key={available.roomId} disabled={busy || !nickname.trim()} onClick={() => void connect(available.roomId)}>
+        {rooms.map((available) => <button className="online-room-card" key={available.roomId} disabled={busy || !nickname.trim()} onClick={() => { requestGamePresentation(); void connect(available.roomId); }}>
           <span><strong>{available.code}</strong><small>{available.hostName || t('online.unnamedHost')}</small></span>
           <span>{available.clients}/{available.maxClients}</span>
         </button>)}
@@ -1185,7 +1202,7 @@ function Lobby({ progress, updateProgress, runtime, openModal, startSingle }: {
         <div className="lobby-main-actions">
           <div className="mode-actions">
             <button className="mode-button offline" onClick={startSingle}><span className="mode-icon" style={{ '--mode-icon': `url("${offlineIcon}")` } as CSSProperties} aria-hidden="true" /><strong>{t('home.offline')}</strong></button>
-            <button className="mode-button online" onClick={() => openModal('online')}><span className="mode-icon" style={{ '--mode-icon': `url("${onlineIcon}")` } as CSSProperties} aria-hidden="true" /><strong>{t('home.online')}</strong></button>
+            <button className="mode-button online" onClick={() => { requestGamePresentation(); openModal('online'); }}><span className="mode-icon" style={{ '--mode-icon': `url("${onlineIcon}")` } as CSSProperties} aria-hidden="true" /><strong>{t('home.online')}</strong></button>
             <button className="mode-button gacha" onClick={() => openModal('gacha')}><span className="mode-icon" style={{ '--mode-icon': `url("${gachaIcon}")` } as CSSProperties} aria-hidden="true" /><strong>{t('action.gacha')}</strong></button>
           </div>
           <div className="feature-actions">
@@ -1210,7 +1227,7 @@ function GameApp({ runtime, progress, updateProgress }: { runtime: PlatformRunti
     {screen === 'single'
       ? <SinglePlayer runtime={runtime} progress={progress} updateProgress={updateProgress} onBgmScene={setBgmScene} onExit={() => { releaseOrientationLock(); setBgmScene('base'); setScreen('lobby'); }} />
       : <>
-        <Lobby progress={progress} updateProgress={updateProgress} runtime={runtime} openModal={setModal} startSingle={() => { requestLandscapeOrientation(); setBgmScene('match'); setScreen('single'); }} />
+        <Lobby progress={progress} updateProgress={updateProgress} runtime={runtime} openModal={setModal} startSingle={() => { requestGamePresentation(); setBgmScene('match'); setScreen('single'); }} />
         {modal === 'language' && <Modal title={t('language.title')} onClose={() => setModal(null)}><div className="language-list">{SUPPORTED_LOCALES.map((locale) => <button key={locale} className={progress.settings.locale === locale ? 'active' : ''} onClick={() => updateProgress({ ...progress, settings: { ...progress.settings, locale } })}>{t(`language.${locale}`)}</button>)}</div></Modal>}
         {modal === 'characters' && <CharacterModal progress={progress} runtime={runtime} updateProgress={updateProgress} onClose={() => setModal(null)} />}
         {modal === 'equipment' && <EquipmentModal progress={progress} runtime={runtime} updateProgress={updateProgress} onClose={() => setModal(null)} />}
