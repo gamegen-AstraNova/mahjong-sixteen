@@ -107,7 +107,7 @@ button { color: inherit; }
   isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1.12fr) minmax(20rem, .88fr);
-  width: 100%; height: 100dvh; min-height: 31rem;
+  width: 100%; height: 100dvh; min-height: 0;
   overflow: visible; container-type: size;
   background-position: center; background-size: cover;
   color: var(--ink);
