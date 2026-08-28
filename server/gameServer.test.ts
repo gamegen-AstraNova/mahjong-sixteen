@@ -1,7 +1,7 @@
 import { createServer } from 'node:net';
 import { Client as ColyseusClient, type Room } from 'colyseus.js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { MEV, MMSG } from '../src/game/multiplayerProtocol';
+import { MEV, MMSG, type OnlineEmote } from '../src/game/multiplayerProtocol';
 import type { MahjongState } from '../src/game/mahjong';
 import { createMahjongGameServer } from './gameServer';
 
@@ -50,6 +50,21 @@ function nextGameView(room: Room<LobbyState>, predicate: (view: GameViewMessage)
   });
 }
 
+function nextEmote(room: Room<LobbyState>, predicate: (emote: OnlineEmote) => boolean, timeoutMs = 2_000): Promise<OnlineEmote> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      off?.();
+      reject(new Error('Timed out waiting for multiplayer emote.'));
+    }, timeoutMs);
+    const off = room.onMessage(MEV.emote, (emote: OnlineEmote) => {
+      if (!predicate(emote)) return;
+      clearTimeout(timeout);
+      off?.();
+      resolve(emote);
+    });
+  });
+}
+
 describe('Colyseus multiplayer server', () => {
   const gameServer = createMahjongGameServer();
   let endpoint = '';
@@ -89,6 +104,15 @@ describe('Colyseus multiplayer server', () => {
     room.send(MMSG.action, { kind: 'auto' });
     const advancedView = await advancedViewPromise;
     expect(advancedView.state.players.reduce((total, hand) => total + hand.discards.length, 0)).toBeGreaterThan(beforeDiscards);
+
+    const cosmeticRandom = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const npcReplyPromise = nextEmote(room, (emote) => emote.seat !== 0);
+      room.send(MMSG.emote, { emote: '👏' });
+      await expect(npcReplyPromise).resolves.toEqual({ seat: 1, emote: '👏' });
+    } finally {
+      cosmeticRandom.mockRestore();
+    }
     await room.leave(true);
   }, 20_000);
 });

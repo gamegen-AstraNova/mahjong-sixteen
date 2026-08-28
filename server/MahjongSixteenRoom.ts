@@ -16,12 +16,13 @@ import {
   type MahjongState,
   type TileId,
 } from '../src/game/mahjong.js';
+import { detectMatchActionSignals, type MatchSeat } from '../src/game/matchActionEvents.js';
 import { MAHJONG_SIXTEEN_ROOM, MEV, MMSG, type MahjongOnlineAction } from '../src/game/multiplayerProtocol.js';
+import { NPC_EMOTE_REPLY_DELAY_MIN_MS, NPC_EMOTE_REPLY_DELAY_RANGE_MS, isMatchEmote, npcActionEmotes, npcPlayerEmoteReply } from '../src/game/npcEmotes.js';
 import { MahjongRoomState, OnlinePlayerState } from './state.js';
 
 const SETTLEMENT_AUTO_ADVANCE_MS = 10_000;
 const BOT_ACTION_DELAY_MS = 1_500;
-const VALID_EMOTES = new Set(['😊', '😄', '😮', '😢', '😤', '🤔', '👏', '✨']);
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const BOT_PROFILES = [
   { name: 'Lumi', character: 'mio_1' },
@@ -169,8 +170,10 @@ export class MahjongSixteenRoom extends Room<MahjongRoomState> {
       this.reject(client);
       return;
     }
-    this.gameState = this.prepareClaimTurn(next, payload.kind === 'discard' || payload.kind === 'ready');
+    const prepared = this.prepareClaimTurn(next, payload.kind === 'discard' || payload.kind === 'ready');
+    this.gameState = prepared;
     this.publishGameState();
+    this.publishNpcActionEmotes(before, prepared);
   }
 
   private autoPlay(current: MahjongState, claimMelds = false): MahjongState {
@@ -248,9 +251,24 @@ export class MahjongSixteenRoom extends Room<MahjongRoomState> {
 
   private relayEmote(client: Client, payload: unknown): void {
     const player = this.state.players.get(client.sessionId);
-    const emote = typeof (payload as { emote?: unknown } | null)?.emote === 'string' ? (payload as { emote: string }).emote : '';
-    if (!player || !VALID_EMOTES.has(emote)) return;
+    const emote = (payload as { emote?: unknown } | null)?.emote;
+    if (!player || !isMatchEmote(emote)) return;
     this.broadcast(MEV.emote, { seat: player.slot, emote });
+    const reply = npcPlayerEmoteReply(emote, this.npcSeats());
+    if (!reply) return;
+    const delay = NPC_EMOTE_REPLY_DELAY_MIN_MS + Math.round(Math.random() * NPC_EMOTE_REPLY_DELAY_RANGE_MS);
+    this.clock.setTimeout(() => this.broadcast(MEV.emote, reply), delay);
+  }
+
+  private npcSeats(): MatchSeat[] {
+    return Array.from(this.state.players.values())
+      .filter((player) => player.bot)
+      .map((player) => player.slot as MatchSeat);
+  }
+
+  private publishNpcActionEmotes(previous: MahjongState, current: MahjongState): void {
+    const signals = detectMatchActionSignals(previous, current);
+    npcActionEmotes(signals, this.npcSeats()).forEach((reaction) => this.broadcast(MEV.emote, reaction));
   }
 
   private publishGameState(resetTimer = true): void {
@@ -289,10 +307,13 @@ export class MahjongSixteenRoom extends Room<MahjongRoomState> {
       if (!this.gameState) return;
       if (this.gameState.settlement) this.advanceRound();
       else {
-        const activePlayer = this.playerAtSlot(this.gameState.currentPlayer);
-        const automated = this.autoPlay(this.gameState, activePlayer?.bot === true);
-        this.gameState = this.prepareClaimTurn(automated, this.gameState.phase === 'discard');
+        const previous = this.gameState;
+        const activePlayer = this.playerAtSlot(previous.currentPlayer);
+        const automated = this.autoPlay(previous, activePlayer?.bot === true);
+        const prepared = this.prepareClaimTurn(automated, previous.phase === 'discard');
+        this.gameState = prepared;
         this.publishGameState();
+        this.publishNpcActionEmotes(previous, prepared);
       }
     }, delayMs);
   }
