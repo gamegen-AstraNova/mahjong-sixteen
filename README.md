@@ -14,7 +14,7 @@ npm test
 npm run build
 ```
 
-`npm run dev` 會在背景啟動固定於 `127.0.0.1:4173` 的開發服務，並在 Vite 意外退出時自動重啟。可用 `npm run dev:status` 查看狀態；需要前景除錯時使用 `npm run dev:foreground`。
+`npm run dev` 會在背景同時啟動 `127.0.0.1:4173` 的網頁與 `127.0.0.1:2567` 的多人伺服器，任一服務意外退出時會一起重啟。可用 `npm run dev:status` 查看狀態；需要分別在前景除錯時使用 `npm run dev:foreground` 與 `npm run server:dev`。
 
 ## GameGen 結構
 
@@ -38,13 +38,15 @@ npm run build
 - 台灣十六張摸打流程、花牌補牌、吃碰槓、聽牌、自摸／放槍與自動操作
 - 動作貼圖、勝者特寫、台數與桌分結算、牌局金幣換算
 - 牌局表情連發、自動代打與規則／台數說明
-- Colyseus `mahjong-sixteen` 連線大廳：暱稱、公開房間、建立／加入、四人座位與房主開始
+- Colyseus `mahjong-sixteen` 權威連線牌局：公開房間、建立／加入、四人座位、房主開始、伺服器計時與完整摸打結算
 
-單機牌局可直接遊玩；連線牌局仍需部署並填入相容的 Colyseus WebSocket 端點。
+單機與本機連線牌局可直接遊玩；空位會由 Lumi、Nyx、Asteria 補齊，方便單人驗證完整多人流程。
 
 ## 多人伺服器
 
-部署後可將 WebSocket 端點填入 `public/config/generalConfiguration.json` 的 `serverUrl`。本機測試亦可用 `?server=ws://127.0.0.1:2567` 暫時覆寫，不會把本機網址寫入正式產物。
+多人伺服器原始碼位於 `server/`，`npm run build` 會同步產出 `server-dist/`，可用 `npm run server` 啟動正式產物；`Dockerfile` 可直接建立獨立的伺服器容器。
+
+部署伺服器後，將公開的 `wss://` 端點填入 `public/config/generalConfiguration.json` 的 `serverUrl`。URL 查詢參數 `?server=wss://example.com` 可在不改設定檔的情況下覆寫端點；本機頁面若未設定端點，會自動連到同一主機的 `2567` 連接埠。
 
 ## GitHub Pages
 

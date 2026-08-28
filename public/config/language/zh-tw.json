@@ -1,7 +1,7 @@
 {
   "app": { "title": "麻將十六張", "subtitle": "AstraNova" },
   "home": {
-    "offline": "單機", "online": "連線", "onlineComing": "連線模式已預留伺服器接口，將於後續開放。",
+    "offline": "單機", "online": "連線",
     "coins": "持有金幣", "hideUi": "隱藏介面", "showUi": "顯示介面",
     "rerollLine": "點擊角色重新抽選台詞",
     "line": {

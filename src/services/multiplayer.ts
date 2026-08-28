@@ -1,15 +1,7 @@
 import { Client, type Room, type RoomAvailable } from 'colyseus.js';
-import type { MahjongState, TileId } from '../game/mahjong';
-
-export const MAHJONG_SIXTEEN_ROOM = 'mahjong-sixteen';
-export const MMSG = { start: 'mahjong:start', action: 'mahjong:action', continue: 'mahjong:continue', emote: 'mahjong:emote' } as const;
-export const MEV = { matchStart: 'mahjong:match-start', roundStart: 'mahjong:round-start', gameState: 'mahjong:game-state', emote: 'mahjong:emote', actionRejected: 'mahjong:action-rejected' } as const;
-
-export type MahjongOnlineAction =
-  | { kind: 'discard' | 'ready'; tileIndex: number }
-  | { kind: 'kong'; tile: TileId }
-  | { kind: 'claim'; optionIndex: number }
-  | { kind: 'pass' | 'auto' };
+import type { MahjongState } from '../game/mahjong';
+import { MAHJONG_SIXTEEN_ROOM, MEV, type OnlineEmote } from '../game/multiplayerProtocol';
+export { MMSG, type OnlineEmote } from '../game/multiplayerProtocol';
 
 export interface MahjongRoomMeta {
   code?: string;
@@ -52,11 +44,6 @@ export interface OnlineGameView {
   canAct: boolean;
   turnDeadline: number;
   advanceReadyCount: number;
-}
-
-export interface OnlineEmote {
-  seat: number;
-  emote: string;
 }
 
 type SchemaPlayers = { forEach(callback: (player: Record<string, unknown>, id: string) => void): void };

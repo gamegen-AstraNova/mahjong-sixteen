@@ -55,6 +55,26 @@ function absoluteRoot(value: string): string | null {
   }
 }
 
+export function normalizeServerUrl(value: string | null | undefined, pageUrl: string): string {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed || trimmed.includes('{{')) return '';
+  try {
+    const url = new URL(trimmed, pageUrl);
+    if (url.protocol === 'http:') url.protocol = 'ws:';
+    else if (url.protocol === 'https:') url.protocol = 'wss:';
+    if (url.protocol !== 'ws:' && url.protocol !== 'wss:') return '';
+    return url.href.replace(/\/$/u, '');
+  } catch {
+    return '';
+  }
+}
+
+function localServerUrl(pageUrl: string): string {
+  const page = new URL(pageUrl);
+  if (page.hostname !== '127.0.0.1' && page.hostname !== 'localhost') return '';
+  return `${page.protocol === 'https:' ? 'wss' : 'ws'}://${page.hostname}:2567`;
+}
+
 export function localAssetUrl(relativePath: string): string {
   return new URL(`${APP_BASE}${stripLeadingSlash(relativePath)}`, location.href).href;
 }
@@ -205,7 +225,11 @@ export async function bootstrapPlatform(onProgress?: (progress: BootstrapProgres
   });
 
   const byPath = new Map(entries.map((entry) => [stripLeadingSlash(entry.relativePath).toLowerCase(), assets[entry.id]]));
-  const serverUrl = new URLSearchParams(location.search).get('server')?.trim() || configuration.serverUrl?.trim() || '';
+  const serverUrl = [
+    new URLSearchParams(location.search).get('server'),
+    configuration.serverUrl,
+    localServerUrl(location.href),
+  ].map((candidate) => normalizeServerUrl(candidate, location.href)).find(Boolean) ?? '';
   return {
     assets,
     languagePacks,

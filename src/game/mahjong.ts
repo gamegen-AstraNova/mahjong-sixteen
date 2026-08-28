@@ -12,6 +12,7 @@ export interface TaiResult { total: number; patterns: TaiPattern[]; }
 export interface HandSettlement { reason: 'win' | 'draw'; tai: number; patterns: TaiPattern[]; deltas: number[]; bankruptPlayer: number | null; }
 export interface RoundProgress { dealer: number; handNumber: number; dealerStreak: number; eastSeat?: number; prevailingWind?: WindTile; }
 export interface WaitingTileInfo { tile: TileId; remaining: number; }
+export interface PendingClaimTurn { player: number; options: ClaimOption[]; }
 export interface GameplayTuning {
   favoredPlayer: number | null;
   drawAssistChance: number;
@@ -310,16 +311,26 @@ function applyMeldClaim(state: MahjongState, player: number, option: ClaimOption
 }
 function nextPlayer(player: number): number { return (player + 3) % 4; }
 function counterclockwisePlayers(discarder: number): number[] { return [1, 2, 3].map((offset) => (discarder - offset + 4) % 4); }
-function resolvePendingClaims(state: MahjongState, skipped: Set<number> = new Set(), tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING, random: () => number = Math.random) {
-  const pending = state.pendingDiscard; if (!pending) return;
-  const ordered = counterclockwisePlayers(pending.player).filter((player) => !skipped.has(player)); const byPlayer = new Map(ordered.map((player) => [player, getClaimOptions(state, player)]));
+export function nextPendingClaimTurn(state: MahjongState, skipped: ReadonlySet<number> = new Set()): PendingClaimTurn | null {
+  const pending = state.pendingDiscard;
+  if (!pending) return null;
+  const ordered = counterclockwisePlayers(pending.player).filter((player) => !skipped.has(player));
+  const byPlayer = new Map(ordered.map((player) => [player, getClaimOptions(state, player)]));
   const winner = ordered.find((player) => byPlayer.get(player)?.some((option) => option.kind === 'win'));
-  if (winner !== undefined) { if (winner === 0) { state.currentPlayer = 0; state.phase = 'claim'; state.claimOptions = byPlayer.get(0)!.filter((option) => option.kind === 'win'); } else finishDiscardWin(state, winner); return; }
+  if (winner !== undefined) return { player: winner, options: byPlayer.get(winner)!.filter((option) => option.kind === 'win') };
   const setPlayer = ordered.find((player) => byPlayer.get(player)?.some((option) => option.kind === 'kong' || option.kind === 'pong'));
-  if (setPlayer !== undefined) { const options = byPlayer.get(setPlayer)!.filter((option) => option.kind === 'kong' || option.kind === 'pong'); if (setPlayer === 0) { state.currentPlayer = 0; state.phase = 'claim'; state.claimOptions = options; } else applyMeldClaim(state, setPlayer, options.find((option) => option.kind === 'kong') ?? options[0], tuning, random); return; }
+  if (setPlayer !== undefined) return { player: setPlayer, options: byPlayer.get(setPlayer)!.filter((option) => option.kind === 'kong' || option.kind === 'pong') };
   const next = nextPlayer(pending.player);
-  if (!skipped.has(next)) { const options = (byPlayer.get(next) ?? []).filter((option) => option.kind === 'chi'); if (options.length) { if (next === 0) { state.currentPlayer = 0; state.phase = 'claim'; state.claimOptions = options; } else applyMeldClaim(state, next, options[0], tuning, random); return; } }
-  advanceAfterDiscard(state, tuning, random);
+  const chi = skipped.has(next) ? [] : (byPlayer.get(next) ?? []).filter((option) => option.kind === 'chi');
+  return chi.length ? { player: next, options: chi } : null;
+}
+function resolvePendingClaims(state: MahjongState, skipped: Set<number> = new Set(), tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING, random: () => number = Math.random) {
+  const turn = nextPendingClaimTurn(state, skipped);
+  if (!turn) { advanceAfterDiscard(state, tuning, random); return; }
+  if (turn.player === 0) { state.currentPlayer = 0; state.phase = 'claim'; state.claimOptions = turn.options; return; }
+  const option = turn.options.find((candidate) => candidate.kind === 'win') ?? turn.options.find((candidate) => candidate.kind === 'kong') ?? turn.options[0];
+  if (option.kind === 'win') finishDiscardWin(state, turn.player);
+  else applyMeldClaim(state, turn.player, option, tuning, random);
 }
 
 function tileValue(tile: TileId, hand: TileId[]): number {
@@ -377,8 +388,11 @@ export function declareReadyAwaitingClaims(source: MahjongState, player: number,
   const state = structuredClone(source); state.readyDeclared[player] = true; return discardTileAwaitingInternal(state, player, tileIndex, true);
 }
 export function claimDiscardForPlayer(source: MahjongState, player: number, optionIndex: number): MahjongState {
-  if (!source.pendingDiscard) return source;
-  const option = getClaimOptions(source, player)[optionIndex]; if (!option) return source;
+  if (!source.pendingDiscard || source.phase !== 'claim') return source;
+  const options = source.currentPlayer === player && source.claimOptions.length > 0
+    ? source.claimOptions
+    : getClaimOptions(source, player);
+  const option = options[optionIndex]; if (!option) return source;
   const state = structuredClone(source); if (option.kind === 'win') finishDiscardWin(state, player); else applyMeldClaim(state, player, option); return state;
 }
 export function advanceAfterAllPasses(source: MahjongState, tuning: Readonly<GameplayTuning> = STANDARD_GAMEPLAY_TUNING, random: () => number = Math.random): MahjongState {

@@ -1,7 +1,7 @@
 {
   "app": { "title": "麻將十六張", "subtitle": "AstraNova" },
   "home": {
-    "offline": "ソロ", "online": "オンライン", "onlineComing": "サーバー接続用インターフェースを準備済みです。後日公開します。",
+    "offline": "ソロ", "online": "オンライン",
     "coins": "所持コイン", "hideUi": "UIを隠す", "showUi": "UIを表示",
     "rerollLine": "キャラを押して別の台詞を聞く",
     "line": {
