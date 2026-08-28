@@ -4,6 +4,7 @@ import { ASSETS, tileFaceAsset } from './config/assets';
 import { CHARACTER_IDS, CHARACTER_SKINS, OUTFIT_THEME_SLUGS, TABLES, TILE_BACKS, floorBackgroundForOutfit, lobbyBackgroundForOutfit, uiThemeForOutfit } from './config/catalog';
 import { INITIAL_POINTS, SINGLE_PLAYER_TUNING, TURN_TIME_SECONDS, autoPlayCurrentTurn, claimDiscard, createInitialState, declareKong, declareReady, discardTile, kongTiles, passClaim, readyDiscardIndices, seatWindForPlayer, startNextHand, tileLabel, waitingTiles, type ClaimOption, type MahjongState, type MeldKind, type TileId } from './game/mahjong';
 import { detectMatchActionSignals, matchActionDuration, type MatchActionKind, type MatchActionSignal } from './game/matchActionEvents';
+import { createMatchEmoteFlight, type MatchEmoteFlight, type MatchEmoteSeat } from './game/matchEmoteFlight';
 import { MATCH_EMOTES, NPC_EMOTE_REPLY_DELAY_MIN_MS, NPC_EMOTE_REPLY_DELAY_RANGE_MS, npcActionEmotes, npcPlayerEmoteReply, type MatchEmote } from './game/npcEmotes';
 import { I18nProvider, useI18n } from './i18n/I18nProvider';
 import { MahjongTable3D } from './MahjongTable3D';
@@ -536,15 +537,9 @@ type ResultStage = 'settlement' | 'coins' | null;
 type QueuedMatchAction = MatchActionSignal & { id: number };
 type MatchUtilityPanel = 'emote' | 'help' | null;
 type ClaimChoice = { source: 'discard'; kind: MeldKind } | { source: 'kong'; kind: 'kong' } | null;
-type MatchEmoteBurst = {
+type MatchEmoteBurst = MatchEmoteFlight & {
   id: number;
   emote: string;
-  seat: 0 | 1 | 2 | 3;
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-  rotation: number;
 };
 
 const MATCH_STEP_DELAY_MS = 1_500;
@@ -612,24 +607,11 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit, o
   const nextEmoteId = useRef(1);
   const lastOnlineEmoteId = useRef(0);
   const npcEmoteReplyTimers = useRef(new Set<number>());
-  const showEmote = useCallback((emote: string, seat: MatchEmoteBurst['seat'] = 0) => {
-    const spread = () => Math.round((Math.random() - .5) * 18);
-    const paths: Record<MatchEmoteBurst['seat'], [number, number, number, number]> = {
-      0: [spread(), 38 + Math.random() * 5, spread() * .65, 5 + Math.random() * 6],
-      1: [-39 - Math.random() * 5, spread(), -5 - Math.random() * 6, spread() * .65],
-      2: [spread(), -38 - Math.random() * 5, spread() * .65, -5 - Math.random() * 6],
-      3: [39 + Math.random() * 5, spread(), 5 + Math.random() * 6, spread() * .65],
-    };
-    const [startX, startY, endX, endY] = paths[seat];
+  const showEmote = useCallback((emote: string, seat: MatchEmoteSeat = 0) => {
     setEmoteBursts((bursts) => [...bursts, {
       id: nextEmoteId.current++,
       emote,
-      seat,
-      startX,
-      startY,
-      endX,
-      endY,
-      rotation: Math.round((Math.random() - .5) * 22),
+      ...createMatchEmoteFlight(seat),
     }]);
   }, []);
   const activeAction = actionQueue[0] ?? null;
@@ -860,7 +842,7 @@ function SinglePlayer({ runtime, progress, updateProgress, onBgmScene, onExit, o
     if (!online) return;
     online.emoteEvents.filter((event) => event.id > lastOnlineEmoteId.current).forEach((event) => {
       lastOnlineEmoteId.current = Math.max(lastOnlineEmoteId.current, event.id);
-      showEmote(event.emote, ((event.seat - online.view.playerSlot + 4) % 4) as MatchEmoteBurst['seat']);
+      showEmote(event.emote, ((event.seat - online.view.playerSlot + 4) % 4) as MatchEmoteSeat);
     });
   }, [online, showEmote]);
   const matchToolIconStyle = (relativePath: string) => ({

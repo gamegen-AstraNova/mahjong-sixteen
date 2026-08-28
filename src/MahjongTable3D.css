@@ -514,9 +514,9 @@
 
 .match-emote-burst {
   --emote-start-x: 0vw;
-  --emote-start-y: 36vh;
+  --emote-start-y: 40vh;
   --emote-end-x: 0vw;
-  --emote-end-y: -20vh;
+  --emote-end-y: 16vh;
   --emote-rotation: 0deg;
   --emote-rotation-reverse: 0deg;
   --emote-rotation-soft: 0deg;
@@ -524,6 +524,7 @@
   position: absolute;
   left: 50%;
   top: 50%;
+  translate: -50% -50%;
   display: grid;
   place-items: center;
   width: clamp(3.6rem, 8.5vmin, 5.5rem);
